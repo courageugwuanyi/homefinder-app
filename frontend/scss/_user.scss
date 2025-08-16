@@ -1,0 +1,52 @@
+// 
+// user.scss
+// Use this to write your custom SCSS
+//
+
+// Responsive font size for agent names
+@media (max-width: 1180px) {
+  .my-responsive-font {
+    font-size: 0.875rem !important;
+  }
+}
+
+.promotions-header > span {
+  overflow: visible !important;
+}
+
+// Swap between two images on hover
+.swap-image {
+  position: relative;
+  display: inline-block;
+  width: 196px;
+  height: 80px;
+  overflow: hidden;
+}
+
+.swap-image img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.swap-image img:first-child {
+  opacity: 1;
+  z-index: 2;
+}
+
+.swap-image img:last-child {
+  opacity: 0;
+  z-index: 1;
+}
+
+.swap-image:hover img:first-child {
+  opacity: 0;
+}
+
+.swap-image:hover img:last-child {
+  opacity: 1;
+}
+
