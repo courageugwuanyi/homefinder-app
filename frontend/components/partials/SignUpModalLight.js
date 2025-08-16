@@ -119,7 +119,7 @@ const SignUpModalLight = ({ onSwap, pillButtons, ...props }) => {
                 </Form.Group>
                 <Form.Group className="mb-4">
                   <Form.Label htmlFor="su-password">
-                    Password <span className="fs-sm text-muted">min. 8 char</span>
+                    Password
                   </Form.Label>
                   <PasswordToggle
                       id="su-password"
@@ -128,6 +128,7 @@ const SignUpModalLight = ({ onSwap, pillButtons, ...props }) => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                   />
+                  <Form.Text id='passwordHelpBlock'>Password must have minimum of 8 characters with uppercase, lowercase, and numbers only.</Form.Text>
                 </Form.Group>
                 <Form.Group className="mb-4">
                   <Form.Label htmlFor="su-confirm-password">Confirm password</Form.Label>
