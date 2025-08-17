@@ -7,8 +7,8 @@ const propertySchema = new mongoose.Schema({
         required: [true, 'Property title is required'],
         trim: true,
         minLength: [5, 'Title must be at least 5 characters'],
-        maxLength: [150, 'Title cannot exceed 150 characters'],
-        index: 'text' // For text search
+        maxLength: [100, 'Title cannot exceed 100 characters'],
+        index: 'text'
     },
 
     description: {
@@ -16,7 +16,7 @@ const propertySchema = new mongoose.Schema({
         required: [true, 'Property description is required'],
         trim: true,
         minLength: [20, 'Description must be at least 20 characters'],
-        maxLength: [2000, 'Description cannot exceed 2000 characters']
+        maxLength: [1500, 'Description cannot exceed 1500 characters']
     },
 
     // Property Classification
@@ -36,10 +36,10 @@ const propertySchema = new mongoose.Schema({
         required: [true, 'Property type is required'],
         enum: {
             values: [
-                'apartment', 'house', 'duplex', 'bungalow', 'mansion',
-                'commercial', 'office', 'shop', 'warehouse',
-                'land', 'plot', 'farm',
-                'event-centre', 'hotel', 'other'
+                'apartment', 'duplex', 'house', 'bungalow',
+                'office', 'shop', 'warehouse', 'commercial',
+                'plot', 'land', 'farm',
+                'hotel', 'event-centre'
             ],
             message: 'Invalid property type'
         },
@@ -51,49 +51,43 @@ const propertySchema = new mongoose.Schema({
         type: String,
         required: [true, 'Business type is required'],
         enum: {
-            values: ['business', 'private'],
-            message: 'Business type must be business or private'
+            values: ['Business', 'Private seller'],
+            message: 'Business type must be Business or Private seller'
         },
-        default: 'business',
-        lowercase: true
+        default: 'Private seller'
     },
 
-    // Location (Improved structure)
+    // Location Information
     location: {
-        // Address components
-        state: {
+        country: {
             type: String,
-            required: [true, 'State is required'],
+            required: [true, 'Country is required'],
             trim: true,
-            lowercase: true,
             index: true
         },
         city: {
             type: String,
             required: [true, 'City is required'],
             trim: true,
-            lowercase: true,
             index: true
         },
-        area: {
+        district: {
             type: String,
-            required: [true, 'Area/Neighborhood is required'],
+            required: [true, 'District is required'],
             trim: true,
-            lowercase: true,
             index: true
         },
-        streetAddress: {
+        zipCode: {
+            type: String,
+            required: [true, 'Zip code is required'],
+            trim: true,
+            uppercase: true
+        },
+        address: {
             type: String,
             required: [true, 'Street address is required'],
             trim: true
         },
-        postalCode: {
-            type: String,
-            trim: true,
-            uppercase: true
-        },
-
-        // Geospatial data
         coordinates: {
             type: {
                 type: String,
@@ -102,231 +96,245 @@ const propertySchema = new mongoose.Schema({
             },
             coordinates: {
                 type: [Number], // [longitude, latitude]
-                required: [true, 'Coordinates are required'],
                 validate: {
                     validator: function(coordinates) {
-                        return coordinates.length === 2 &&
-                            coordinates[0] >= -180 && coordinates[0] <= 180 && // longitude
-                            coordinates[1] >= -90 && coordinates[1] <= 90;      // latitude
+                        if (!coordinates || coordinates.length !== 2) return true;
+                        return coordinates[0] >= -180 && coordinates[0] <= 180 &&
+                            coordinates[1] >= -90 && coordinates[1] <= 90;
                     },
                     message: 'Invalid coordinates format'
                 }
             }
-        },
-
-        // Additional location info
-        landmarks: [String], // Nearby landmarks
-        accessibility: {
-            publicTransport: Boolean,
-            mainRoad: Boolean,
-            parking: Boolean
         }
     },
 
-    // Property Specifications (Improved)
+    // Property Specifications
     specifications: {
-        // Size information
-        totalArea: {
-            value: Number,
-            unit: {
-                type: String,
-                enum: ['sqft', 'sqm', 'acres', 'hectares'],
-                default: 'sqft'
-            }
-        },
-        coveredArea: {
-            value: Number,
-            unit: {
-                type: String,
-                enum: ['sqft', 'sqm'],
-                default: 'sqft'
+        area: {
+            type: Number,
+            min: [1, 'Area must be positive'],
+            validate: {
+                validator: function(area) {
+                    const areaRequiredTypes = ['duplex', 'bungalow', 'house', 'office', 'shop',
+                        'warehouse', 'commercial', 'plot', 'land', 'farm',
+                        'hotel', 'event-centre'];
+                    if (areaRequiredTypes.includes(this.propertyType)) {
+                        return area && area > 0;
+                    }
+                    return true;
+                },
+                message: 'Area is required for this property type'
             }
         },
 
-        // Room details (Changed to Numbers for better filtering)
         bedrooms: {
-            type: Number,
-            required: [true, 'Number of bedrooms is required'],
-            min: [0, 'Bedrooms cannot be negative'],
-            max: [50, 'Too many bedrooms'],
+            type: String,
+            enum: ['studio', '1', '2', '3', '4', '5+'],
+            validate: {
+                validator: function(bedrooms) {
+                    const bedroomRequiredTypes = ['apartment', 'duplex', 'bungalow', 'house'];
+                    if (bedroomRequiredTypes.includes(this.propertyType)) {
+                        return bedrooms && bedrooms.length > 0;
+                    }
+                    return true;
+                },
+                message: 'Bedrooms specification is required for residential properties'
+            },
             index: true
         },
+
         bathrooms: {
-            type: Number,
-            required: [true, 'Number of bathrooms is required'],
-            min: [0, 'Bathrooms cannot be negative'],
-            max: [50, 'Too many bathrooms'],
-            index: true
+            type: String,
+            enum: ['1', '2', '3', '4', '5+'],
+            validate: {
+                validator: function(bathrooms) {
+                    const bathroomRequiredTypes = ['apartment', 'duplex', 'bungalow', 'house',
+                        'office', 'shop', 'warehouse', 'commercial',
+                        'hotel', 'event-centre'];
+                    if (bathroomRequiredTypes.includes(this.propertyType)) {
+                        return bathrooms && bathrooms.length > 0;
+                    }
+                    return true;
+                },
+                message: 'Bathrooms specification is required for this property type'
+            }
         },
+
         toilets: {
-            type: Number,
-            required: [true, 'Number of toilets is required'],
-            min: [0, 'Toilets cannot be negative'],
-            max: [50, 'Too many toilets']
-        },
-        parkingSpots: {
-            type: Number,
-            required: [true, 'Number of parking spots is required'],
-            min: [0, 'Parking spots cannot be negative'],
-            max: [100, 'Too many parking spots'],
-            default: 0
-        },
-
-        // Property features
-        furnished: {
             type: String,
-            enum: ['furnished', 'semi-furnished', 'unfurnished'],
-            default: 'unfurnished'
+            enum: ['1', '2', '3', '4', '5+'],
+            validate: {
+                validator: function(toilets) {
+                    const toiletRequiredTypes = ['apartment', 'duplex', 'bungalow', 'house',
+                        'office', 'shop', 'warehouse', 'commercial',
+                        'hotel', 'event-centre'];
+                    if (toiletRequiredTypes.includes(this.propertyType)) {
+                        return toilets && toilets.length > 0;
+                    }
+                    return true;
+                },
+                message: 'Toilets specification is required for this property type'
+            }
         },
 
-        condition: {
+        parking: {
             type: String,
-            enum: ['new', 'excellent', 'good', 'fair', 'needs-renovation'],
-            default: 'good'
+            enum: ['1', '2', '3', '4+'],
+            validate: {
+                validator: function(parking) {
+                    const parkingRequiredTypes = ['apartment', 'duplex', 'bungalow', 'house',
+                        'office', 'shop', 'warehouse', 'commercial',
+                        'hotel', 'event-centre'];
+                    if (parkingRequiredTypes.includes(this.propertyType)) {
+                        return parking && parking.length > 0;
+                    }
+                    return true;
+                },
+                message: 'Parking specification is required for this property type'
+            }
         },
 
-        yearBuilt: {
-            type: Number,
-            min: [1800, 'Year built too old'],
-            max: [new Date().getFullYear() + 2, 'Year built cannot be in far future']
+        floors: {
+            type: String,
+            enum: ['1', '2', '3', '4+']
         },
 
-        // Amenities (Organized)
-        amenities: {
-            basic: [{
-                type: String,
-                enum: [
-                    'electricity', 'water', 'internet', 'cable-tv',
-                    'air-conditioning', 'heating', 'generator'
-                ]
-            }],
-            security: [{
-                type: String,
-                enum: [
-                    'security-guard', 'cctv', 'gate', 'fence',
-                    'alarm-system', 'intercom'
-                ]
-            }],
-            recreational: [{
-                type: String,
-                enum: [
-                    'swimming-pool', 'gym', 'playground', 'garden',
-                    'basketball-court', 'tennis-court', 'clubhouse'
-                ]
-            }],
-            convenience: [{
-                type: String,
-                enum: [
-                    'elevator', 'garage', 'storage', 'laundry',
-                    'balcony', 'terrace', 'study-room'
-                ]
-            }]
+        units: {
+            type: String,
+            enum: ['1-5', '6-10', '11-20', '20+']
         },
 
-        // Pet policy
-        petPolicy: {
-            allowed: { type: Boolean, default: false },
-            types: [{
-                type: String,
-                enum: ['cats', 'dogs', 'birds', 'small-pets']
-            }],
-            deposit: Number // Additional deposit for pets
-        }
+        isServiced: {
+            type: Boolean,
+            default: false,
+            validate: {
+                validator: function(isServiced) {
+                    if (this.category === 'sale') {
+                        return !isServiced;
+                    }
+                    return true;
+                },
+                message: 'Serviced option not applicable for sale properties'
+            }
+        },
+
+        amenities: [{
+            type: String,
+            trim: true
+        }]
     },
 
-    // Pricing (Enhanced)
+    // Pricing Information
     pricing: {
         amount: {
             type: Number,
             required: [true, 'Price amount is required'],
-            min: [0, 'Price cannot be negative'],
+            min: [1, 'Price must be positive'],
             index: true
         },
+
         currency: {
             type: String,
             required: [true, 'Currency is required'],
             enum: {
-                values: ['NGN', 'USD', 'EUR', 'GBP'],
-                message: 'Invalid currency'
+                values: ['ngn', 'usd'],
+                message: 'Currency must be NGN or USD'
             },
-            default: 'NGN',
-            uppercase: true
+            lowercase: true,
+            default: 'ngn'
         },
-        period: {
+
+        priceUnit: {
             type: String,
             required: function() {
-                return this.category === 'rent' || this.category === 'shortlet';
+                return this.category !== 'sale';
             },
             enum: {
-                values: ['day', 'week', 'month', 'year'],
-                message: 'Invalid price period'
+                values: ['hour', 'day', 'week', 'month', 'year', 'total'],
+                message: 'Invalid price unit'
             },
-            lowercase: true
+            default: function() {
+                return this.category === 'sale' ? 'total' : 'month';
+            },
+            validate: {
+                validator: function(priceUnit) {
+                    if (this.category === 'sale') {
+                        return priceUnit === 'total';
+                    }
+                    return ['hour', 'day', 'week', 'month', 'year'].includes(priceUnit);
+                },
+                message: 'Price unit must be "total" for sale properties'
+            }
         },
 
-        // Additional pricing info
-        deposit: Number, // Security deposit
-        commission: Number, // Agent commission
-        serviceCharge: Number, // Annual service charge
-        negotiable: { type: Boolean, default: true },
-
-        // Price history for analytics
-        priceHistory: [{
-            amount: Number,
-            currency: String,
-            changedAt: { type: Date, default: Date.now },
-            reason: String
-        }]
+        negotiable: {
+            type: Boolean,
+            default: true
+        }
     },
 
-    // Media (Enhanced)
+    // Media Files
     media: {
         images: [{
             url: {
                 type: String,
-                required: true,
-                validate: {
-                    validator: function(url) {
-                        return /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/i.test(url);
-                    },
-                    message: 'Invalid image URL format'
-                }
+                required: true
             },
-            caption: String,
-            isPrimary: { type: Boolean, default: false },
-            order: { type: Number, default: 0 }
+            filename: String,
+            isPrimary: {
+                type: Boolean,
+                default: false
+            },
+            uploadedAt: {
+                type: Date,
+                default: Date.now
+            }
         }],
+
         videos: [{
             url: {
                 type: String,
-                validate: {
-                    validator: function(url) {
-                        return /^https?:\/\/.+\.(mp4|avi|mov|webm)$/i.test(url);
-                    },
-                    message: 'Invalid video URL format'
-                }
+                required: true
             },
+            filename: String,
             thumbnail: String,
-            caption: String,
-            duration: Number // in seconds
-        }],
-        virtualTour: String, // 360° tour URL
-        floorPlan: String // Floor plan image URL
+            uploadedAt: {
+                type: Date,
+                default: Date.now
+            }
+        }]
     },
 
-    // Contact Information (Linked to User)
+    // IMPROVED: Agent relationship with better validation
     agent: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User', // Changed from 'RealEstateAgent' to 'User'
+        ref: 'User',
         required: [true, 'Agent is required'],
-        index: true
+        index: true,
+        validate: {
+            validator: async function(agentId) {
+                if (!agentId) return false;
+
+                const User = mongoose.model('User');
+                const user = await User.findById(agentId);
+
+                if (!user) return false;
+
+                // Check if user can add properties
+                return user.accountType !== 'individual' &&
+                    user.accountDetails.accountStatus === 'active' &&
+                    user.activity.propertiesCount < user.subscription.propertiesLimit;
+            },
+            message: 'Invalid agent or agent has reached properties limit'
+        }
     },
 
-    // Additional contact for property
+    // Contact Information
     contact: {
-        name: String,
         phone: {
             type: String,
+            required: [true, 'Phone number is required'],
+            trim: true,
             validate: {
                 validator: function(phone) {
                     return /^[\+]?[\d\s\-\(\)]{10,}$/.test(phone);
@@ -334,20 +342,18 @@ const propertySchema = new mongoose.Schema({
                 message: 'Invalid phone number format'
             }
         },
-        email: {
+        company: {
             type: String,
+            trim: true,
             validate: {
-                validator: function(email) {
-                    return /\S+@\S+\.\S+/.test(email);
+                validator: function(company) {
+                    if (this.businessType === 'Business') {
+                        return company && company.trim().length > 0;
+                    }
+                    return true;
                 },
-                message: 'Invalid email format'
+                message: 'Company name is required for registered businesses'
             }
-        },
-        whatsapp: String,
-        availableHours: {
-            start: String, // e.g., "09:00"
-            end: String,   // e.g., "18:00"
-            timezone: { type: String, default: 'Africa/Lagos' }
         }
     },
 
@@ -355,10 +361,20 @@ const propertySchema = new mongoose.Schema({
     status: {
         type: String,
         enum: {
-            values: ['draft', 'published', 'rented', 'sold', 'archived', 'suspended'],
+            values: ['draft', 'published', 'archived', 'suspended'],
             message: 'Invalid property status'
         },
-        default: 'draft',
+        default: 'published',
+        index: true
+    },
+
+    marketStatus: {
+        type: String,
+        enum: {
+            values: ['available', 'rented', 'sold', 'under-negotiation', 'withdrawn'],
+            message: 'Invalid market status'
+        },
+        default: 'available',
         index: true
     },
 
@@ -383,22 +399,8 @@ const propertySchema = new mongoose.Schema({
         lastViewed: Date,
         viewsThisMonth: { type: Number, default: 0 },
         monthlyViewHistory: [{
-            month: String, // "2024-01"
+            month: String,
             views: Number
-        }]
-    },
-
-    // Property Management
-    availability: {
-        availableFrom: Date,
-        availableUntil: Date, // For shortlets
-        showingSchedule: [{
-            day: {
-                type: String,
-                enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-            },
-            startTime: String,
-            endTime: String
         }]
     },
 
@@ -407,9 +409,8 @@ const propertySchema = new mongoose.Schema({
         slug: {
             type: String,
             unique: true,
-            sparse: true // Allow null values but ensure uniqueness when present
+            sparse: true
         },
-        metaDescription: String,
         keywords: [String]
     },
 
@@ -417,56 +418,60 @@ const propertySchema = new mongoose.Schema({
     adNumber: {
         type: String,
         unique: true,
-        sparse: true // Will be generated automatically
+        sparse: true
     },
 
     expiresAt: {
         type: Date,
-        index: { expireAfterSeconds: 0 } // TTL index for auto-deletion
+        index: { expireAfterSeconds: 0 }
     }
 
 }, {
     timestamps: true,
-    // Add virtual populate options
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
 
-// INDEXES for optimal query performance
+// INDEXES
 propertySchema.index({ category: 1, propertyType: 1 });
-propertySchema.index({ 'location.state': 1, 'location.city': 1, 'location.area': 1 });
+propertySchema.index({ 'location.country': 1, 'location.city': 1, 'location.district': 1 });
 propertySchema.index({ 'pricing.amount': 1, 'pricing.currency': 1 });
 propertySchema.index({ 'specifications.bedrooms': 1, 'specifications.bathrooms': 1 });
-propertySchema.index({ status: 1, featured: -1, createdAt: -1 });
+propertySchema.index({ status: 1, marketStatus: 1, featured: -1, createdAt: -1 });
 propertySchema.index({ agent: 1, status: 1 });
-propertySchema.index({ 'location.coordinates': '2dsphere' }); // Geospatial index
+propertySchema.index({ 'location.coordinates': '2dsphere' });
 
-// Text search index
+// Text search
 propertySchema.index({
     title: 'text',
     description: 'text',
-    'location.area': 'text',
-    'seo.keywords': 'text'
+    'location.district': 'text',
+    'location.city': 'text'
 });
 
 // VIRTUALS
 propertySchema.virtual('fullAddress').get(function() {
-    return `${this.location.streetAddress}, ${this.location.area}, ${this.location.city}, ${this.location.state}`;
+    const { address, district, city, zipCode, country } = this.location;
+    return [address, district, city, zipCode, country].filter(Boolean).join(', ');
 });
 
 propertySchema.virtual('primaryImage').get(function() {
-    const primaryImg = this.media.images.find(img => img.isPrimary);
-    return primaryImg ? primaryImg.url : (this.media.images[0]?.url || null);
+    const primaryImg = this.media.images?.find(img => img.isPrimary);
+    return primaryImg?.url || this.media.images?.[0]?.url || null;
 });
 
-propertySchema.virtual('pricePerSqft').get(function() {
-    if (this.specifications.totalArea?.value && this.pricing.amount) {
-        return Math.round(this.pricing.amount / this.specifications.totalArea.value);
-    }
-    return null;
+propertySchema.virtual('formattedPrice').get(function() {
+    const symbol = this.pricing.currency === 'usd' ? '$' : '₦';
+    const amount = this.pricing.amount.toLocaleString();
+    const unit = this.pricing.priceUnit !== 'total' ? `/${this.pricing.priceUnit}` : '';
+    return `${symbol}${amount}${unit}`;
 });
 
-// METHODS
+propertySchema.virtual('isAvailable').get(function() {
+    return this.status === 'published' && this.marketStatus === 'available';
+});
+
+// INSTANCE METHODS
 propertySchema.methods.incrementViews = async function() {
     this.analytics.views += 1;
     this.analytics.viewsThisMonth += 1;
@@ -474,86 +479,82 @@ propertySchema.methods.incrementViews = async function() {
     return this.save();
 };
 
-propertySchema.methods.toggleFeatured = async function() {
-    this.featured = !this.featured;
+propertySchema.methods.updateMarketStatus = async function(newStatus) {
+    this.marketStatus = newStatus;
+    if (['sold', 'rented', 'withdrawn'].includes(newStatus)) {
+        this.status = 'archived';
+    }
     return this.save();
-};
-
-propertySchema.methods.updateStatus = async function(newStatus) {
-    this.status = newStatus;
-    return this.save();
-};
-
-propertySchema.methods.isAvailable = function() {
-    return ['published'].includes(this.status);
 };
 
 propertySchema.methods.generateSlug = function() {
-    const baseSlug = `${this.title}-${this.location.city}-${this.location.area}`
+    const baseSlug = `${this.title}-${this.location.city}-${this.location.district}`
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-
     this.seo.slug = `${baseSlug}-${this._id.toString().slice(-6)}`;
     return this.seo.slug;
 };
 
-// MIDDLEWARE
-// Generate ad number before saving
-propertySchema.pre('save', async function(next) {
-    if (this.isNew && !this.adNumber) {
-        const count = await mongoose.model('Property').countDocuments();
-        this.adNumber = `HF${Date.now().toString().slice(-6)}${(count + 1).toString().padStart(4, '0')}`;
-    }
-
-    if (this.isNew && !this.seo.slug) {
-        this.generateSlug();
-    }
-
-    next();
-});
-
-// Update price history when price changes
-propertySchema.pre('save', function(next) {
-    if (this.isModified('pricing.amount') && !this.isNew) {
-        this.pricing.priceHistory.push({
-            amount: this.pricing.amount,
-            currency: this.pricing.currency,
-            reason: 'Price updated'
-        });
-    }
-    next();
-});
-
 // STATIC METHODS
-propertySchema.statics.findByLocation = function(state, city, area) {
+propertySchema.statics.findAvailable = function() {
     return this.find({
-        'location.state': state?.toLowerCase(),
-        'location.city': city?.toLowerCase(),
-        ...(area && { 'location.area': area.toLowerCase() }),
-        status: 'published'
+        status: 'published',
+        marketStatus: 'available'
     });
 };
 
-propertySchema.statics.findInPriceRange = function(min, max, currency = 'NGN') {
-    return this.find({
-        'pricing.amount': { $gte: min, $lte: max },
-        'pricing.currency': currency,
-        status: 'published'
-    });
+propertySchema.statics.findByAgent = function(agentId) {
+    return this.find({ agent: agentId }).sort({ createdAt: -1 });
 };
 
-propertySchema.statics.findNearby = function(longitude, latitude, maxDistance = 5000) {
-    return this.find({
-        'location.coordinates': {
-            $near: {
-                $geometry: { type: 'Point', coordinates: [longitude, latitude] },
-                $maxDistance: maxDistance
-            }
-        },
-        status: 'published'
-    });
-};
+// MIDDLEWARE
+// Generate ad number and slug
+propertySchema.pre('save', async function(next) {
+    if (this.isNew) {
+        if (!this.adNumber) {
+            const count = await mongoose.model('Property').countDocuments();
+            this.adNumber = `HF${Date.now().toString().slice(-6)}${(count + 1).toString().padStart(4, '0')}`;
+        }
+
+        if (!this.seo.slug) {
+            this.generateSlug();
+        }
+    }
+    next();
+});
+
+// Update agent's properties count
+propertySchema.post('save', async function(doc) {
+    if (doc.isNew && doc.status === 'published') {
+        const User = mongoose.model('User');
+        await User.findByIdAndUpdate(
+            doc.agent,
+            { $inc: { 'activity.propertiesCount': 1 } }
+        );
+    }
+});
+
+propertySchema.post('findOneAndDelete', async function(doc) {
+    if (doc && doc.status === 'published') {
+        const User = mongoose.model('User');
+        await User.findByIdAndUpdate(
+            doc.agent,
+            { $inc: { 'activity.propertiesCount': -1 } }
+        );
+    }
+});
+
+// Set primary image
+propertySchema.pre('save', function(next) {
+    if (this.media.images && this.media.images.length > 0) {
+        const hasPrimary = this.media.images.some(img => img.isPrimary);
+        if (!hasPrimary) {
+            this.media.images[0].isPrimary = true;
+        }
+    }
+    next();
+});
 
 const Property = mongoose.model('Property', propertySchema);
 
