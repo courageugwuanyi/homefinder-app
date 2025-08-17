@@ -1,8 +1,8 @@
 import Property from '../models/property.model.js';
 import User from '../models/user.model.js';
 import logger from '../config/logger.js';
-import {validationResult} from 'express-validator';
-import {v2 as cloudinary} from 'cloudinary';
+import { validationResult } from 'express-validator';
+import { v2 as cloudinary } from 'cloudinary';
 
 // Helper function to handle validation errors
 const handleValidationErrors = (req, res) => {
@@ -36,7 +36,7 @@ const uploadToCloudinary = async (file, resourceType = 'auto') => {
             ],
             ...(resourceType === 'video' && {
                 eager: [
-                    { width: 400, height: 300, crop: 'fill', format: 'jpg' } // Generate thumbnail
+                    { width: 400, height: 300, crop: 'fill', format: 'jpg' }
                 ]
             })
         };
@@ -93,11 +93,11 @@ const processMediaFiles = async (files) => {
             const maxVideoSize = 100 * 1024 * 1024; // 100MB for videos
 
             if (isImage && file.size > maxImageSize) {
-                throw new Error(`Image file too large. Maximum size is 10MB`);
+                throw new Error('Image file too large. Maximum size is 10MB');
             }
 
             if (isVideo && file.size > maxVideoSize) {
-                throw new Error(`Video file too large. Maximum size is 100MB`);
+                throw new Error('Video file too large. Maximum size is 100MB');
             }
 
             const resourceType = isImage ? 'image' : 'video';
@@ -111,7 +111,7 @@ const processMediaFiles = async (files) => {
                 mimetype: file.mimetype,
                 width: uploadResult.width,
                 height: uploadResult.height,
-                isPrimary: index === 0, // First file is primary
+                isPrimary: index === 0,
                 uploadedAt: new Date()
             };
 
@@ -147,7 +147,6 @@ const processMediaFiles = async (files) => {
 
         return media;
     } catch (error) {
-        // If any upload fails, cleanup uploaded files
         logger.error('Media processing failed, cleaning up uploads');
         throw error;
     }
@@ -155,16 +154,14 @@ const processMediaFiles = async (files) => {
 
 // Add Property
 export const addProperty = async (req, res, next) => {
-    let uploadedFiles = []; // Track uploaded files for cleanup on error
+    let uploadedFiles = [];
 
     try {
-        // Check validation errors
         const validationError = handleValidationErrors(req, res);
         if (validationError) return validationError;
 
         const userId = req.user._id;
 
-        // Verify user can add properties
         const user = await User.findById(userId);
         if (!user) {
             logger.warn('Property add attempt by non-existent user', { userId });
@@ -193,7 +190,6 @@ export const addProperty = async (req, res, next) => {
             });
         }
 
-        // Validate that files are provided
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -201,39 +197,14 @@ export const addProperty = async (req, res, next) => {
             });
         }
 
-        // Extract form data
         const {
-            title,
-            description,
-            category,
-            propertyType,
-            businessType,
-            // Location
-            country,
-            city,
-            district,
-            zipCode,
-            address,
-            // Specifications
-            area,
-            bedrooms,
-            bathrooms,
-            toilets,
-            parking,
-            floors,
-            units,
-            isServiced,
-            amenities,
-            // Pricing
-            price,
-            currency,
-            priceUnit,
-            // Contact
-            phone,
-            company
+            title, description, category, propertyType, businessType,
+            country, city, district, zipCode, address,
+            area, bedrooms, bathrooms, toilets, parking, floors, units, isServiced, amenities,
+            price, currency, priceUnit,
+            phone, company
         } = req.body;
 
-        // Process amenities if provided as string
         let processedAmenities = [];
         if (amenities) {
             try {
@@ -246,11 +217,9 @@ export const addProperty = async (req, res, next) => {
             }
         }
 
-        // Process and upload media files to Cloudinary
         logger.info('Starting media upload to Cloudinary', { fileCount: req.files.length });
         const media = await processMediaFiles(req.files);
 
-        // Track uploaded files for potential cleanup
         uploadedFiles = [
             ...media.images.map(img => ({ publicId: img.publicId, type: 'image' })),
             ...media.videos.map(vid => ({ publicId: vid.publicId, type: 'video' })),
@@ -267,7 +236,6 @@ export const addProperty = async (req, res, next) => {
             });
         }
 
-        // Create property object
         const propertyData = {
             title: title.trim(),
             description: description.trim(),
@@ -307,10 +275,7 @@ export const addProperty = async (req, res, next) => {
             marketStatus: 'available'
         };
 
-        // Create property
         const newProperty = await Property.create(propertyData);
-
-        // Increment user's property count
         await user.incrementPropertiesCount();
 
         logger.info('Property created successfully', {
@@ -351,7 +316,6 @@ export const addProperty = async (req, res, next) => {
     } catch (error) {
         logger.error('Add property error:', error);
 
-        // Cleanup uploaded files if property creation failed
         if (uploadedFiles.length > 0) {
             logger.info('Cleaning up uploaded files due to error');
             uploadedFiles.forEach(async (file) => {
@@ -359,7 +323,6 @@ export const addProperty = async (req, res, next) => {
             });
         }
 
-        // Handle specific errors
         if (error.message.includes('Failed to upload')) {
             return res.status(400).json({
                 success: false,
@@ -367,7 +330,6 @@ export const addProperty = async (req, res, next) => {
             });
         }
 
-        // Handle MongoDB errors
         if (error.code === 11000) {
             return res.status(409).json({
                 success: false,
@@ -392,7 +354,199 @@ export const addProperty = async (req, res, next) => {
     }
 };
 
-// Update Property Media
+// Get User Properties
+export const getUserProperties = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const { page = 1, limit = 10, status, marketStatus, category } = req.query;
+
+        const query = { agent: userId };
+        if (status) query.status = status;
+        if (marketStatus) query.marketStatus = marketStatus;
+        if (category) query.category = category;
+
+        const properties = await Property.find(query)
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .skip((page - 1) * limit)
+            .select('title category propertyType pricing.amount pricing.currency location.city location.district status marketStatus featured createdAt adNumber');
+
+        const total = await Property.countDocuments(query);
+
+        res.json({
+            success: true,
+            data: {
+                properties,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    pages: Math.ceil(total / limit),
+                    total,
+                    hasNext: page < Math.ceil(total / limit),
+                    hasPrev: page > 1
+                }
+            }
+        });
+
+        logger.info('User properties fetched', { userId, count: properties.length });
+
+    } catch (error) {
+        logger.error('Get user properties error:', error);
+        next(error);
+    }
+};
+
+// Update Property Status
+export const updatePropertyStatus = async (req, res, next) => {
+    try {
+        const { propertyId } = req.params;
+        const { status, marketStatus } = req.body;
+        const userId = req.user._id;
+
+        const property = await Property.findOne({
+            _id: propertyId,
+            agent: userId
+        });
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: 'Property not found or you do not have permission to update it'
+            });
+        }
+
+        if (status) property.status = status;
+        if (marketStatus) property.marketStatus = marketStatus;
+
+        await property.save();
+
+        logger.info('Property status updated', { propertyId, userId, status, marketStatus });
+
+        res.json({
+            success: true,
+            message: 'Property status updated successfully',
+            data: {
+                property: {
+                    _id: property._id,
+                    status: property.status,
+                    marketStatus: property.marketStatus
+                }
+            }
+        });
+
+    } catch (error) {
+        logger.error('Update property status error:', error);
+        next(error);
+    }
+};
+
+// Search Properties
+export const searchProperties = async (req, res, next) => {
+    try {
+        const {
+            category, propertyType, minPrice, maxPrice, currency = 'ngn',
+            bedrooms, bathrooms, country, city, district,
+            page = 1, limit = 12, sortBy = 'createdAt', sortOrder = 'desc'
+        } = req.query;
+
+        const query = {
+            status: 'published',
+            marketStatus: 'available'
+        };
+
+        if (category) query.category = category.toLowerCase();
+        if (propertyType) query.propertyType = propertyType.toLowerCase();
+        if (bedrooms) query['specifications.bedrooms'] = bedrooms;
+        if (bathrooms) query['specifications.bathrooms'] = bathrooms;
+
+        if (country) query['location.country'] = new RegExp(country, 'i');
+        if (city) query['location.city'] = new RegExp(city, 'i');
+        if (district) query['location.district'] = new RegExp(district, 'i');
+
+        if (minPrice || maxPrice) {
+            query['pricing.currency'] = currency.toLowerCase();
+            if (minPrice) query['pricing.amount'] = { $gte: parseInt(minPrice) };
+            if (maxPrice) {
+                query['pricing.amount'] = {
+                    ...query['pricing.amount'],
+                    $lte: parseInt(maxPrice)
+                };
+            }
+        }
+
+        const sortOptions = {};
+        sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+        const properties = await Property.find(query)
+            .populate('agent', 'fullName businessInfo.companyName activity.averageRating')
+            .sort(sortOptions)
+            .limit(limit)
+            .skip((page - 1) * limit)
+            .select('-agent.email -agent.phoneNumber -__v');
+
+        const total = await Property.countDocuments(query);
+
+        res.json({
+            success: true,
+            data: {
+                properties,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    pages: Math.ceil(total / limit),
+                    total,
+                    hasNext: page < Math.ceil(total / limit),
+                    hasPrev: page > 1
+                }
+            }
+        });
+
+        logger.info('Property search performed', {
+            query: Object.keys(query),
+            resultsCount: properties.length
+        });
+
+    } catch (error) {
+        logger.error('Search properties error:', error);
+        next(error);
+    }
+};
+
+// Other functions (getProperty, updatePropertyMedia, deleteProperty) - keep as they were
+export const getProperty = async (req, res, next) => {
+    try {
+        const { propertyId } = req.params;
+
+        const property = await Property.findById(propertyId)
+            .populate('agent', 'fullName email phoneNumber businessInfo.companyName activity.averageRating activity.totalReviews')
+            .select('-__v');
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: 'Property not found'
+            });
+        }
+
+        if (property.status === 'published') {
+            await property.incrementViews();
+        }
+
+        res.json({
+            success: true,
+            data: {
+                property
+            }
+        });
+
+        logger.info('Property viewed', { propertyId, agentId: property.agent._id });
+
+    } catch (error) {
+        logger.error('Get property error:', error);
+        next(error);
+    }
+};
+
 export const updatePropertyMedia = async (req, res, next) => {
     try {
         const { propertyId } = req.params;
@@ -413,13 +567,11 @@ export const updatePropertyMedia = async (req, res, next) => {
 
         let updatedMedia = { ...property.media };
 
-        // Remove specified images
         if (removeImages.length > 0) {
             const imagesToRemove = updatedMedia.images.filter(img =>
                 removeImages.includes(img.publicId)
             );
 
-            // Delete from Cloudinary
             for (const img of imagesToRemove) {
                 await deleteFromCloudinary(img.publicId, 'image');
             }
@@ -429,13 +581,11 @@ export const updatePropertyMedia = async (req, res, next) => {
             );
         }
 
-        // Remove specified videos
         if (removeVideos.length > 0) {
             const videosToRemove = updatedMedia.videos.filter(vid =>
                 removeVideos.includes(vid.publicId)
             );
 
-            // Delete from Cloudinary (including thumbnails)
             for (const vid of videosToRemove) {
                 await deleteFromCloudinary(vid.publicId, 'video');
                 if (vid.thumbnailPublicId) {
@@ -448,14 +598,12 @@ export const updatePropertyMedia = async (req, res, next) => {
             );
         }
 
-        // Add new files if provided
         if (req.files && req.files.length > 0) {
             const newMedia = await processMediaFiles(req.files);
             updatedMedia.images.push(...newMedia.images);
             updatedMedia.videos.push(...newMedia.videos);
         }
 
-        // Ensure at least one media file remains
         if (updatedMedia.images.length === 0 && updatedMedia.videos.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -463,7 +611,6 @@ export const updatePropertyMedia = async (req, res, next) => {
             });
         }
 
-        // Update property
         property.media = updatedMedia;
         await property.save();
 
@@ -493,7 +640,6 @@ export const updatePropertyMedia = async (req, res, next) => {
     }
 };
 
-// Delete Property (with Cloudinary cleanup)
 export const deleteProperty = async (req, res, next) => {
     try {
         const { propertyId } = req.params;
@@ -511,15 +657,12 @@ export const deleteProperty = async (req, res, next) => {
             });
         }
 
-        // Delete all media files from Cloudinary
         const deletePromises = [];
 
-        // Delete images
         property.media.images.forEach(image => {
             deletePromises.push(deleteFromCloudinary(image.publicId, 'image'));
         });
 
-        // Delete videos and their thumbnails
         property.media.videos.forEach(video => {
             deletePromises.push(deleteFromCloudinary(video.publicId, 'video'));
             if (video.thumbnailPublicId) {
@@ -527,12 +670,10 @@ export const deleteProperty = async (req, res, next) => {
             }
         });
 
-        // Execute all deletions (don't wait as it's cleanup)
         Promise.all(deletePromises).catch(error => {
             logger.error('Error cleaning up Cloudinary files:', error);
         });
 
-        // Decrement user's property count
         const user = await User.findById(userId);
         if (user) {
             await user.decrementPropertiesCount();
@@ -551,219 +692,6 @@ export const deleteProperty = async (req, res, next) => {
 
     } catch (error) {
         logger.error('Delete property error:', error);
-        next(error);
-    }
-};
-
-// Get User Properties
-export const getUserProperties = async (req, res, next) => {
-    try {
-        const userId = req.user._id;
-        const { page = 1, limit = 10, status, marketStatus, category } = req.query;
-
-        // Build query
-        const query = { agent: userId };
-        if (status) query.status = status;
-        if (marketStatus) query.marketStatus = marketStatus;
-        if (category) query.category = category;
-
-        // Execute query with pagination
-        const properties = await Property.find(query)
-            .sort({ createdAt: -1 })
-            .limit(limit * 1)  // Fixed: was "limit _1"
-            .skip((page - 1) * limit)  // Fixed: was "(page - 1)_ limit"
-            .select('title category propertyType pricing.amount pricing.currency location.city location.district status marketStatus featured createdAt adNumber');
-
-        const total = await Property.countDocuments(query);
-
-        res.json({
-            success: true,
-            data: {  // Fixed: was missing "data:"
-                properties,
-                pagination: {  // Fixed: was missing "pagination:"
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    pages: Math.ceil(total / limit),
-                    total,
-                    hasNext: page < Math.ceil(total / limit),
-                    hasPrev: page > 1
-                }
-            }
-        });
-
-        logger.info('User properties fetched', { userId, count: properties.length });
-
-    } catch (error) {
-        logger.error('Get user properties error:', error);
-        next(error);
-    }
-};
-
-// Update Property Status (existing function - no changes needed)
-export const updatePropertyStatus = async (req, res, next) => {
-    try {
-        const { propertyId } = req.params;
-        const { status, marketStatus } = req.body;
-        const userId = req.user._id;
-
-        const property = await Property.findOne({
-            _id: propertyId,
-            agent: userId
-        });
-
-        if (!property) {
-            return res.status(404).json({
-                success: false,
-                message: 'Property not found or you do not have permission to update it'
-            });
-        }
-
-        // Update fields
-        if (status) property.status = status;
-        if (marketStatus) property.marketStatus = marketStatus;
-
-        await property.save();
-
-        logger.info('Property status updated', { propertyId, userId, status, marketStatus });
-
-        res.json({
-            success: true,
-            message: 'Property status updated successfully',
-            data: {
-                property: {
-                    _id: property._id,
-                    status: property.status,
-                    marketStatus: property.marketStatus
-                }
-            }
-        });
-
-    } catch (error) {
-        logger.error('Update property status error:', error);
-        next(error);
-    }
-};
-
-// Get Single Property (existing function - no changes needed)
-export const getProperty = async (req, res, next) => {
-    try {
-        const { propertyId } = req.params;
-
-        const property = await Property.findById(propertyId)
-            .populate('agent', 'fullName email phoneNumber businessInfo.companyName activity.averageRating activity.totalReviews')
-            .select('-__v');
-
-        if (!property) {
-            return res.status(404).json({
-                success: false,
-                message: 'Property not found'
-            });
-        }
-
-        // Increment view count if it's a public view
-        if (property.status === 'published') {
-            await property.incrementViews();
-        }
-
-        res.json({
-            success: true,
-            data: {
-                property
-            }
-        });
-
-        logger.info('Property viewed', { propertyId, agentId: property.agent._id });
-
-    } catch (error) {
-        logger.error('Get property error:', error);
-        next(error);
-    }
-};
-
-// Search Properties (existing function - no changes needed)
-export const searchProperties = async (req, res, next) => {
-    try {
-        const {
-            category,
-            propertyType,
-            minPrice,
-            maxPrice,
-            currency = 'ngn',
-            bedrooms,
-            bathrooms,
-            country,
-            city,
-            district,
-            page = 1,
-            limit = 12,
-            sortBy = 'createdAt',
-            sortOrder = 'desc'
-        } = req.query;
-
-        // Build search query
-        const query = {
-            status: 'published',
-            marketStatus: 'available'
-        };
-
-        if (category) query.category = category.toLowerCase();
-        if (propertyType) query.propertyType = propertyType.toLowerCase();
-        if (bedrooms) query['specifications.bedrooms'] = bedrooms;
-        if (bathrooms) query['specifications.bathrooms'] = bathrooms;
-
-        // Location filters
-        if (country) query['location.country'] = new RegExp(country, 'i');
-        if (city) query['location.city'] = new RegExp(city, 'i');
-        if (district) query['location.district'] = new RegExp(district, 'i');
-
-        // Price range filter
-        if (minPrice || maxPrice) {
-            query['pricing.currency'] = currency.toLowerCase();
-            if (minPrice) query['pricing.amount'] = { $gte: parseInt(minPrice) };
-            if (maxPrice) {
-                query['pricing.amount'] = {
-                    ...query['pricing.amount'],
-                    $lte: parseInt(maxPrice)
-                };
-            }
-        }
-
-        // Sort options
-        const sortOptions = {};
-        sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-        // Execute search with pagination
-        const properties = await Property.find(query)
-            .populate('agent', 'fullName businessInfo.companyName activity.averageRating')
-            .sort(sortOptions)
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .select('-agent.email -agent.phoneNumber -__v');
-
-        const total = await Property.countDocuments(query);
-
-        res.json({
-            success: true,
-            data: {
-                properties,
-                pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    pages: Math.ceil(total / limit),
-                    total,
-                    hasNext: page < Math.ceil(total / limit),
-                    hasPrev: page > 1
-                }
-            }
-        });
-
-        logger.info('Property search performed', {
-            query: Object.keys(query),
-            resultsCount: properties.length
-        });
-
-    } catch (error) {
-        logger.error('Search properties error:', error);
         next(error);
     }
 };
