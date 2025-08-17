@@ -926,7 +926,6 @@ const AddPropertyPage = () => {
             <Modal.Header closeButton>
               <h3 className='h5 text-muted fw-normal modal-title d-none d-sm-block text-nowrap'>Property preview</h3>
               <div className='d-flex align-items-center justify-content-sm-end w-100 ms-sm-auto'>
-                <Button as={Link} href='/real-estate/property-promotion' size='sm' className='me-4'>Save and continue</Button>
                 <span className='fs-xs text-muted ms-auto ms-sm-0 me-2'>[ESC]</span>
               </div>
             </Modal.Header>
