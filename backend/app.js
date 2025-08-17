@@ -11,7 +11,8 @@ import workflowRouter from './routes/workflow.routes.js';
 import connectToDatabase from './database/mongodb.js';
 import errorMiddleware from './middlewares/error.middleware.js';
 import arcjetMiddleware from './middlewares/arcject.middleware.js';
-import logger from './config/logger.js'; // Import the logger
+import logger from './config/logger.js';
+import propertyRouter from "./routes/property.routes.js";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use(arcjetMiddleware);
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
+app.use('/api/properties', propertyRouter);
 app.use('/api/subscriptions', subscriptionRouter);
 app.use('/api/workflows', workflowRouter);
 
