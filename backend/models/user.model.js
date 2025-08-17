@@ -6,36 +6,54 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Name is required.'],
         trim: true,
-        minlength: 2,
-        maxlength: 50,
+        minlength: [2, 'Name must be at least 2 characters'],
+        maxlength: [100, 'Name cannot exceed 100 characters'],
+        index: 'text'
     },
+
     email: {
         type: String,
-        required: [
-            function() {
-                return !this.clerkId;
-            },
-            'Email is required.'
-        ],
+        required: function() {
+            return !this.clerkId;
+        },
         unique: true,
+        sparse: true,
         trim: true,
         lowercase: true,
         validate: {
             validator: function(v) {
-                // Only validate if email is provided or required
                 if (this.clerkId && !v) return true;
-                return /\S+@\S+\.\S+/.test(v);
+                return v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
             },
-            message: props => `${props.value} is not a valid email address!`
-        }
+            message: 'Please provide a valid email address'
+        },
+        index: true
     },
+
     phoneNumber: {
         type: String,
+        trim: true,
+        validate: {
+            validator: function(v) {
+                if (!v) return true;
+                return /^[\+]?[\d\s\-\(\)]{10,}$/.test(v);
+            },
+            message: 'Please provide a valid phone number'
+        }
     },
+
     accountType: {
         type: String,
-        enum: ['agent', 'individual', 'owner', 'developer'],
+        required: [true, 'Account type is required'],
+        enum: {
+            values: ['agent', 'individual', 'owner', 'developer'],
+            message: 'Invalid account type'
+        },
+        default: 'individual',
+        index: true
     },
+
+    // Authentication & Security
     accountDetails: {
         password: {
             type: String,
@@ -44,99 +62,209 @@ const userSchema = new mongoose.Schema({
             },
             validate: {
                 validator: function(value) {
-                    return this.authMethod !== 'form' || (value && value.length >= 8);
+                    if (this.authMethod !== 'form') return true;
+                    return value && value.length >= 8;
                 },
-                message: props => `Password must be at least 8 characters long`
-            }
+                message: 'Password must be at least 8 characters long'
+            },
+            select: false // Hide by default
         },
         passwordResetToken: String,
         passwordResetExpires: Date,
-        lastLogin: { type: Date },
-        accountStatus: { type: String, enum: ['active', 'inactive', 'suspended'], default: 'active' },
+        lastLogin: {
+            type: Date,
+            default: Date.now
+        },
+        accountStatus: {
+            type: String,
+            enum: ['active', 'inactive', 'suspended', 'pending'],
+            default: 'active',
+            index: true
+        }
     },
-    wishlist: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Wishlist'
-    },
-    notificationConfig: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'NotificationConfig'
-    },
+
+    // Profile Information (matching auth controller expectations)
     profilePicture: {
         type: String,
-        default: 'https://example.com/default-profile-picture.png'
+        default: null
     },
+
+    // Business Information
+    businessInfo: {
+        companyName: {
+            type: String,
+            trim: true,
+            maxlength: [200, 'Company name cannot exceed 200 characters']
+        },
+        licenseNumber: String,
+        yearsOfExperience: {
+            type: Number,
+            min: 0,
+            max: 50
+        },
+        isVerifiedBusiness: {
+            type: Boolean,
+            default: false
+        }
+    },
+
+    // External Authentication (matching auth controller)
     clerkId: {
         type: String,
         unique: true,
         sparse: true,
-        required: [
-            function() {
-                return this.authMethod !== 'form';
-            },
-            'Sign In Using Google or Apple'
-        ],
-        validate: {
-            validator: function(v) {
-                if (this.authMethod === 'form') return true;
-                return v && v.length > 0;
-            },
-            message: props => 'Clerk ID is required.'
-        }
+        required: function() {
+            return this.authMethod !== 'form';
+        },
+        index: true
     },
+
     authMethod: {
         type: String,
         required: true,
         enum: ['form', 'clerk'],
         default: 'form'
+    },
+
+    // Activity Tracking
+    activity: {
+        propertiesCount: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        totalViews: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        averageRating: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 5
+        },
+        totalReviews: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        lastActive: {
+            type: Date,
+            default: Date.now
+        }
+    },
+
+    // Subscription & Permissions
+    subscription: {
+        plan: {
+            type: String,
+            enum: ['free', 'basic', 'premium', 'enterprise'],
+            default: 'free'
+        },
+        propertiesLimit: {
+            type: Number,
+            default: function() {
+                const limits = {
+                    individual: 0,
+                    agent: 10,
+                    owner: 25,
+                    developer: 100
+                };
+                return limits[this.accountType] || 0;
+            }
+        }
     }
+
 }, {
     timestamps: true,
-    discriminatorKey: 'accountType'
+    toJSON: {
+        virtuals: true,
+        transform: function(doc, ret) {
+            // Remove sensitive fields when converting to JSON
+            if (ret.accountDetails) {
+                delete ret.accountDetails.password;
+                delete ret.accountDetails.passwordResetToken;
+            }
+            return ret;
+        }
+    },
+    toObject: { virtuals: true }
 });
 
-// Method to add a property to wishlist
-userSchema.methods.addToWishlist = async function(propertyId) {
-    let wishlist = await this.model('Wishlist').findOne({ user: this._id });
-    if (!wishlist) {
-        wishlist = new this.model('Wishlist')({ user: this._id, properties: [] });
+// VIRTUALS (matching auth controller expectations)
+userSchema.virtual('firstName').get(function() {
+    return this.fullName ? this.fullName.split(' ')[0] : '';
+});
+
+userSchema.virtual('lastName').get(function() {
+    const nameParts = this.fullName ? this.fullName.split(' ') : [];
+    return nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+});
+
+userSchema.virtual('canAddProperties').get(function() {
+    return this.accountType !== 'individual' &&
+        this.accountDetails.accountStatus === 'active' &&
+        this.activity.propertiesCount < this.subscription.propertiesLimit;
+});
+
+// Virtual for email verification (used in auth controller)
+userSchema.virtual('emailVerified').get(function() {
+    return this.authMethod === 'clerk' || this.accountDetails.accountStatus === 'active';
+});
+
+// INSTANCE METHODS (matching auth controller usage)
+userSchema.methods.comparePassword = async function(candidatePassword) {
+    if (this.authMethod !== 'form') {
+        throw new Error('This account was created using Google or Apple. Please sign in using Google or Apple.');
     }
-    wishlist.properties.addToSet(propertyId);
-    await wishlist.save();
-    this.wishlist = wishlist._id;
+    if (!this.accountDetails.password) {
+        throw new Error('No password set for this account');
+    }
+    return bcrypt.compare(candidatePassword, this.accountDetails.password);
+};
+
+userSchema.methods.updatePassword = async function(newPassword) {
+    if (this.authMethod !== 'form') {
+        throw new Error('Cannot update password for social accounts');
+    }
+    const salt = await bcrypt.genSalt(12);
+    this.accountDetails.password = await bcrypt.hash(newPassword, salt);
+    this.accountDetails.passwordResetToken = undefined;
+    this.accountDetails.passwordResetExpires = undefined;
     return this.save();
 };
 
-// Method to remove a property from wishlist
-userSchema.methods.removeFromWishlist = async function(propertyId) {
-    const wishlist = await this.model('Wishlist').findOne({ user: this._id });
-    if (wishlist) {
-        wishlist.properties.pull(propertyId);
-        await wishlist.save();
-    }
-    return this;
-};
-
-// Method to update notification settings
-userSchema.methods.updateNotificationSettings = async function(settings) {
-    let config = await this.model('NotificationConfig').findOne({ user: this._id });
-    if (!config) {
-        config = new this.model('NotificationConfig')({ user: this._id, ...settings });
-    } else {
-        Object.assign(config, settings);
-    }
-    await config.save();
-    this.notificationConfig = config._id;
+userSchema.methods.incrementPropertiesCount = async function() {
+    this.activity.propertiesCount += 1;
     return this.save();
 };
 
-// Password hashing middleware
+userSchema.methods.decrementPropertiesCount = async function() {
+    if (this.activity.propertiesCount > 0) {
+        this.activity.propertiesCount -= 1;
+    }
+    return this.save();
+};
+
+// STATIC METHODS (matching auth controller usage)
+userSchema.statics.findByEmail = function(email) {
+    return this.findOne({ email: email.toLowerCase() });
+};
+
+userSchema.statics.findByClerkId = function(clerkId) {
+    return this.findOne({ clerkId });
+};
+
+// MIDDLEWARE
+// Hash password before saving
 userSchema.pre('save', async function(next) {
     if (this.authMethod !== 'form' || !this.isModified('accountDetails.password')) {
         return next();
     }
+
     try {
-        const salt = await bcrypt.genSalt(10);
+        const salt = await bcrypt.genSalt(12);
         this.accountDetails.password = await bcrypt.hash(this.accountDetails.password, salt);
         next();
     } catch (error) {
@@ -144,43 +272,23 @@ userSchema.pre('save', async function(next) {
     }
 });
 
-// Method to compare passwords
-userSchema.methods.comparePassword = async function(userPassword) {
-    if (this.authMethod !== 'form') {
-        throw new Error('This account was created using Google or Apple. Please sign in using Google or Apple.');
+// Update properties limit when account type changes
+userSchema.pre('save', function(next) {
+    if (this.isModified('accountType')) {
+        const limits = {
+            individual: 0,
+            agent: 10,
+            owner: 25,
+            developer: 100
+        };
+        this.subscription.propertiesLimit = limits[this.accountType] || 0;
     }
-    return bcrypt.compare(userPassword, this.accountDetails.password);
-};
-
-// Method to update password
-userSchema.methods.updatePassword = async function(newPassword) {
-    const salt = await bcrypt.genSalt(10);
-    this.accountDetails.password = await bcrypt.hash(newPassword, salt);
-    return this.save();
-};
-
-// Virtual for getting reviews written by a user
-userSchema.virtual('reviewsWritten', {
-    ref: 'Review',
-    localField: '_id',
-    foreignField: 'author'
+    next();
 });
 
-// Method to write a review (for both regular users and agents)
-userSchema.methods.writeReview = async function(agentId, rating, text) {
-    const Review = this.model('Review');
-    const newReview = new Review({
-        author: this._id,
-        recipient: agentId,
-        rating,
-        text
-    });
-    await newReview.save();
-    return newReview;
-};
-
-// Indexes for better query performance
-userSchema.index({ clerkId: 1, email: 1 }); // Optimized for your auth queries
+// INDEXES
+userSchema.index({ email: 1, clerkId: 1 });
+userSchema.index({ accountType: 1, 'accountDetails.accountStatus': 1 });
 userSchema.index({ fullName: 'text' });
 
 const User = mongoose.model('User', userSchema);
