@@ -676,7 +676,7 @@ const AddPropertyPage = () => {
 
       // Redirect after success
       setTimeout(() => {
-        router.push('/real-estate/property-promotion')
+        router.push(`/real-estate/catalog?category=${formData.category}`)
       }, 2000)
     }
   }, [validateForm, validationErrors, prepareFormData, addProperty, router])
@@ -707,7 +707,7 @@ const AddPropertyPage = () => {
     }
   }, [isAuthenticated, validationErrors, isCompanyRequired])
 
-  // Handle amenities change
+  // Handle amenity change
   const handleAmenityChange = useCallback((amenityValue, isChecked) => {
     if (isChecked) {
       setSelectedAmenities(prev => [...prev, amenityValue])
