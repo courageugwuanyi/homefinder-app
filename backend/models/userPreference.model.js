@@ -2,94 +2,105 @@ import mongoose from 'mongoose';
 
 const userPreferenceSchema = new mongoose.Schema({
     // Link to the main user
-    userId: {
+    user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
-        unique: true
+        required: [true, 'User is required'],
+        unique: true,
+        index: true
     },
 
-    // What they're looking for
-    interestedIn: [{
-        type: String,
-        enum: ['buy', 'rent', 'shortlet'],
-        default: []
-    }],
-
-    // Where they want to look
-    preferredLocations: [{
-        type: String,
-        trim: true
-    }],
-
-    // Budget range
-    budget: {
-        min: {
-            type: Number,
-            min: 0,
-            default: 0
-        },
-        max: {
-            type: Number,
-            min: 0,
-            validate: {
-                validator: function(v) {
-                    return !v || v >= this.budget.min;
-                },
-                message: 'Maximum budget must be greater than or equal to minimum budget'
-            }
-        },
-        currency: {
+    // Search & Interest Preferences
+    searchPreferences: {
+        // What they're looking for
+        interestedIn: [{
             type: String,
-            enum: ['NGN', 'USD', 'EUR', 'GBP'],
-            default: 'NGN'
-        }
-    },
-
-    // Property preferences
-    propertyPreferences: {
-        types: [{
-            type: String,
-            enum: ['apartment', 'house', 'condo', 'townhouse', 'duplex', 'land', 'commercial'],
+            enum: ['rent', 'sale', 'shortlet'],
             default: []
         }],
-        bedrooms: {
-            min: { type: Number, min: 0, default: 1 },
-            max: { type: Number, min: 0, default: 10 }
-        },
-        bathrooms: {
-            min: { type: Number, min: 0, default: 1 },
-            max: { type: Number, min: 0, default: 10 }
-        },
-        furnishing: {
+
+        // Preferred property types (updated to match your Property model)
+        propertyTypes: [{
             type: String,
-            enum: ['furnished', 'semi-furnished', 'unfurnished', 'any'],
-            default: 'any'
+            enum: [
+                'apartment', 'duplex', 'house', 'bungalow',
+                'office', 'shop', 'warehouse', 'commercial',
+                'plot', 'land', 'farm', 'hotel', 'event-centre'
+            ],
+            default: []
+        }],
+
+        // Budget range
+        budget: {
+            min: {
+                type: Number,
+                min: 0,
+                default: 0
+            },
+            max: {
+                type: Number,
+                min: 0,
+                validate: {
+                    validator: function(v) {
+                        return !v || v >= this.budget?.min || 0;
+                    },
+                    message: 'Maximum budget must be greater than minimum budget'
+                }
+            },
+            currency: {
+                type: String,
+                enum: ['ngn', 'usd'], // Updated to match Property model
+                default: 'ngn'
+            }
         },
-        amenities: [{
+
+        // Location preferences (updated structure)
+        preferredLocations: [{
+            country: String,
+            city: String,
+            district: String
+        }],
+
+        // Property specifications
+        specifications: {
+            bedrooms: {
+                min: { type: String, enum: ['studio', '1', '2', '3', '4', '5+'], default: '1' },
+                max: { type: String, enum: ['studio', '1', '2', '3', '4', '5+'], default: '5+' }
+            },
+            bathrooms: {
+                min: { type: String, enum: ['1', '2', '3', '4', '5+'], default: '1' },
+                max: { type: String, enum: ['1', '2', '3', '4', '5+'], default: '5+' }
+            },
+            parkingRequired: { type: Boolean, default: false },
+            servicedProperty: { type: Boolean, default: false }
+        },
+
+        // Preferred amenities (updated from your Property model)
+        preferredAmenities: [{
             type: String,
-            enum: ['parking', 'gym', 'pool', 'security', 'generator', 'garden', 'balcony']
+            trim: true
         }]
     },
 
-    // Saved searches (for complex search criteria)
-    savedSearches: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'SavedSearch'
-    }],
-
-    // Notification preferences
-    notifications: {
+    // Notification Preferences (consolidated from your User model)
+    notificationPreferences: {
         email: {
             newListings: { type: Boolean, default: true },
             priceChanges: { type: Boolean, default: true },
             savedSearchAlerts: { type: Boolean, default: true },
-            newsletter: { type: Boolean, default: false }
+            recommendations: { type: Boolean, default: true },
+            newsletter: { type: Boolean, default: false },
+            marketingEmails: { type: Boolean, default: false }
         },
         push: {
             newListings: { type: Boolean, default: false },
             priceChanges: { type: Boolean, default: false },
-            savedSearchAlerts: { type: Boolean, default: false }
+            savedSearchAlerts: { type: Boolean, default: false },
+            recommendations: { type: Boolean, default: false }
+        },
+        sms: {
+            urgentUpdates: { type: Boolean, default: false },
+            priceAlerts: { type: Boolean, default: false }
         },
         frequency: {
             type: String,
@@ -98,10 +109,36 @@ const userPreferenceSchema = new mongoose.Schema({
         }
     },
 
-    // Search behavior tracking (for recommendations)
-    searchBehavior: {
+    // Wishlist (simple array instead of separate model)
+    wishlist: [{
+        property: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Property',
+            required: true
+        },
+        addedAt: {
+            type: Date,
+            default: Date.now
+        },
+        notes: {
+            type: String,
+            maxlength: 200
+        }
+    }],
+
+    // Search behavior tracking (for AI recommendations)
+    behaviorAnalytics: {
         mostViewedAreas: [String],
-        averageTimeOnListings: Number,
+        mostViewedPropertyTypes: [String],
+        averageTimeOnListings: {
+            type: Number,
+            default: 0
+        },
+        totalSearches: {
+            type: Number,
+            default: 0
+        },
+        lastSearchDate: Date,
         preferredContactMethod: {
             type: String,
             enum: ['phone', 'email', 'whatsapp'],
@@ -117,80 +154,128 @@ const userPreferenceSchema = new mongoose.Schema({
             default: 'agents-only'
         },
         showContactInfo: { type: Boolean, default: false },
-        allowRecommendations: { type: Boolean, default: true }
+        allowRecommendations: { type: Boolean, default: true },
+        shareViewingHistory: { type: Boolean, default: false }
     }
 
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Indexes for better query performance
-userPreferenceSchema.index({ userId: 1 });
-userPreferenceSchema.index({ 'preferredLocations': 1 });
-userPreferenceSchema.index({ 'budget.min': 1, 'budget.max': 1 });
-userPreferenceSchema.index({ 'propertyPreferences.types': 1 });
+// INDEXES
+userPreferenceSchema.index({ user: 1 });
+userPreferenceSchema.index({ 'searchPreferences.preferredLocations.city': 1 });
+userPreferenceSchema.index({ 'searchPreferences.budget.min': 1, 'searchPreferences.budget.max': 1 });
+userPreferenceSchema.index({ 'searchPreferences.propertyTypes': 1 });
+userPreferenceSchema.index({ 'wishlist.property': 1 });
 
-// Virtual to get the number of saved searches
-userPreferenceSchema.virtual('savedSearchCount').get(function() {
-    return this.savedSearches ? this.savedSearches.length : 0;
+// VIRTUALS
+userPreferenceSchema.virtual('wishlistCount').get(function() {
+    return this.wishlist ? this.wishlist.length : 0;
 });
 
-// Method to add a saved search
-userPreferenceSchema.methods.addSavedSearch = function(savedSearchId) {
-    if (!this.savedSearches.includes(savedSearchId)) {
-        this.savedSearches.push(savedSearchId);
+userPreferenceSchema.virtual('hasActivePreferences').get(function() {
+    return this.searchPreferences.interestedIn.length > 0 ||
+        this.searchPreferences.propertyTypes.length > 0 ||
+        this.searchPreferences.preferredLocations.length > 0;
+});
+
+// INSTANCE METHODS
+userPreferenceSchema.methods.addToWishlist = function(propertyId, notes = '') {
+    // Check if property already in wishlist
+    const existingIndex = this.wishlist.findIndex(
+        item => item.property.toString() === propertyId.toString()
+    );
+
+    if (existingIndex === -1) {
+        this.wishlist.push({
+            property: propertyId,
+            notes: notes.trim(),
+            addedAt: new Date()
+        });
     }
+
     return this.save();
 };
 
-// Method to remove a saved search
-userPreferenceSchema.methods.removeSavedSearch = function(savedSearchId) {
-    this.savedSearches = this.savedSearches.filter(
-        id => id.toString() !== savedSearchId.toString()
+userPreferenceSchema.methods.removeFromWishlist = function(propertyId) {
+    this.wishlist = this.wishlist.filter(
+        item => item.property.toString() !== propertyId.toString()
     );
     return this.save();
 };
 
-// Method to update property preferences
-userPreferenceSchema.methods.updatePropertyPreferences = function(newPreferences) {
-    Object.assign(this.propertyPreferences, newPreferences);
+userPreferenceSchema.methods.updateSearchPreferences = function(newPreferences) {
+    Object.assign(this.searchPreferences, newPreferences);
     return this.save();
 };
 
-// Method to update notification settings
-userPreferenceSchema.methods.updateNotificationSettings = function(newSettings) {
-    Object.assign(this.notifications, newSettings);
+userPreferenceSchema.methods.updateNotificationPreferences = function(newPreferences) {
+    Object.assign(this.notificationPreferences, newPreferences);
     return this.save();
 };
 
-// Method to update budget
-userPreferenceSchema.methods.updateBudget = function(min, max, currency = 'NGN') {
-    this.budget = { min, max, currency };
+userPreferenceSchema.methods.trackSearch = async function(searchData) {
+    this.behaviorAnalytics.totalSearches += 1;
+    this.behaviorAnalytics.lastSearchDate = new Date();
+
+    // Track location searches
+    if (searchData.location) {
+        if (!this.behaviorAnalytics.mostViewedAreas.includes(searchData.location)) {
+            this.behaviorAnalytics.mostViewedAreas.push(searchData.location);
+        }
+    }
+
+    // Track property type searches
+    if (searchData.propertyType) {
+        if (!this.behaviorAnalytics.mostViewedPropertyTypes.includes(searchData.propertyType)) {
+            this.behaviorAnalytics.mostViewedPropertyTypes.push(searchData.propertyType);
+        }
+    }
+
     return this.save();
 };
 
-// Static method to get or create preferences for a user
+// STATIC METHODS
 userPreferenceSchema.statics.getOrCreateForUser = async function(userId) {
-    let preferences = await this.findOne({ userId });
+    let preferences = await this.findOne({ user: userId });
 
     if (!preferences) {
         preferences = await this.create({
-            userId,
-            // Default preferences for new users
-            interestedIn: [],
-            preferredLocations: [],
-            budget: { min: 0, max: null, currency: 'NGN' },
-            propertyPreferences: {
-                types: [],
-                bedrooms: { min: 1, max: 10 },
-                bathrooms: { min: 1, max: 10 },
-                furnishing: 'any',
-                amenities: []
+            user: userId,
+            searchPreferences: {
+                interestedIn: [],
+                propertyTypes: [],
+                budget: { min: 0, max: null, currency: 'ngn' },
+                preferredLocations: [],
+                specifications: {
+                    bedrooms: { min: '1', max: '5+' },
+                    bathrooms: { min: '1', max: '5+' },
+                    parkingRequired: false,
+                    servicedProperty: false
+                },
+                preferredAmenities: []
             }
         });
     }
 
     return preferences;
+};
+
+userPreferenceSchema.statics.findUsersInterestedIn = function(propertyData) {
+    const query = {
+        'searchPreferences.interestedIn': propertyData.category
+    };
+
+    if (propertyData.propertyType) {
+        query['searchPreferences.propertyTypes'] = propertyData.propertyType;
+    }
+
+    return this.find(query)
+        .populate('user', 'fullName email notificationPreferences')
+        .where('notificationPreferences.email.newListings').equals(true);
 };
 
 const UserPreferences = mongoose.model('UserPreferences', userPreferenceSchema);
