@@ -19,7 +19,8 @@ const OAuthButtons = ({ pillButtons, onswap }) => {
 
         await signIn.authenticateWithRedirect({
             strategy,
-            redirectUrl: '/auth/callback'
+            redirectUrl: '/auth/sso-callback',
+            redirectUrlComplete: '/auth/callback',
         });
 
     };
