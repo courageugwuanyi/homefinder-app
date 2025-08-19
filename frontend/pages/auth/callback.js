@@ -323,18 +323,18 @@ const AuthCallback = () => {
                 <Container>
                     <Row className="justify-content-center">
                         <Col md={6} lg={4}>
-                            <div className="card card-body border-0 shadow-sm text-center p-4">
+                            <div className="text-center p-4">
                                 <div className="spinner-border text-primary mb-4" role="status" style={{ width: '3rem', height: '3rem', margin: '0 auto' }}>
                                     <span className="visually-hidden">Loading...</span>
                                 </div>
-                                <h2 className="h4 mb-2">
+                                <h2 className="h4 mb-2 text-primary">
                                     {error ? 'Authentication failed...' :
                                         user ? `Welcome${user.fullName ? `, ${user.fullName}` : ''}!` :
                                             'Completing sign in...'}
                                 </h2>
                                 <p className="text-muted mb-0">
                                     {error ? 'Redirecting...' :
-                                        user ? 'Taking you to your dashboard...' :
+                                        user ? 'Finalizing...' :
                                             'Please wait...'}
                                 </p>
                             </div>
