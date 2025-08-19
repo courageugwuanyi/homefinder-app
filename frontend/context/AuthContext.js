@@ -204,7 +204,6 @@ export const AuthProvider = ({ children }) => {
                 firstName: clerkUser.firstName || '',
                 lastName: clerkUser.lastName || '',
                 email: clerkUser.primaryEmailAddress?.emailAddress || '',
-                accountType: 'regular',
                 clerkId: clerkUser.id || ''
             });
 
