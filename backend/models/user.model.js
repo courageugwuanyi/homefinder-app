@@ -8,7 +8,6 @@ const userSchema = new mongoose.Schema({
         trim: true,
         minlength: [2, 'Name must be at least 2 characters'],
         maxlength: [100, 'Name cannot exceed 100 characters'],
-        index: 'text'
     },
 
     email: {
@@ -44,12 +43,10 @@ const userSchema = new mongoose.Schema({
 
     accountType: {
         type: String,
-        required: [true, 'Account type is required'],
         enum: {
             values: ['agent', 'individual', 'owner', 'developer'],
             message: 'Invalid account type'
         },
-        default: 'individual',
         index: true
     },
 
