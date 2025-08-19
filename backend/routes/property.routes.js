@@ -17,7 +17,7 @@ const propertyRouter = Router();
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 100 * 1024 * 1024, // FIXED: was "100 _1024_ 1024"
+        fileSize: 100 * 1024 * 1024,
         files: 10
     },
     fileFilter: (req, file, cb) => {
@@ -30,12 +30,13 @@ const upload = multer({
 });
 
 propertyRouter.get('/search', searchProperties);
-propertyRouter.get('/:propertyId', getProperty);
 
 propertyRouter.use(authorize);
 
 propertyRouter.post('/add-property', upload.array('gallery', 10), validateAddProperty, addProperty);
 propertyRouter.get('/my-properties', getUserProperties);
+
+propertyRouter.get('/:propertyId', getProperty);
 propertyRouter.put('/:propertyId/status', updatePropertyStatus);
 propertyRouter.put('/:propertyId/media', upload.array('gallery', 10), updatePropertyMedia);
 propertyRouter.delete('/:propertyId', deleteProperty);
