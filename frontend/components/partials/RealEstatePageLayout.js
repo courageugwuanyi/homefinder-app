@@ -271,9 +271,6 @@ const RealEstatePageLayout = (props) => {
                       </Dropdown.Item>
                     </Dropdown.Menu>
                   </Nav.Item>
-                  {/*<Nav.Item >*/}
-                  {/*  <Nav.Link as={Link} href='/real-estate'>Home</Nav.Link>*/}
-                  {/*</Nav.Item>*/}
                   <Nav.Item as={Dropdown}>
                     <Dropdown.Toggle as={Nav.Link} active={props.activeNav==='Pages'}>Home</Dropdown.Toggle>
                     <Dropdown.Menu renderOnMount>
