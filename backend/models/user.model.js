@@ -201,8 +201,8 @@ userSchema.virtual('lastName').get(function() {
 
 userSchema.virtual('canAddProperties').get(function() {
     return this.accountType !== 'individual' &&
-        this.accountDetails.accountStatus === 'active' &&
-        this.activity.propertiesCount < this.subscription.propertiesLimit;
+        this.accountDetails.accountStatus === 'active'
+        // && this.activity.propertiesCount < this.subscription.propertiesLimit;
 });
 
 // Virtual for email verification (used in auth controller)
