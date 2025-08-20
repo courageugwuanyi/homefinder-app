@@ -29,7 +29,7 @@ import VenueCardOverlay from "../../components/VenueCardOverlay";
 import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import Tooltip from "react-bootstrap/Tooltip";
 import { useAuth } from "../../hooks/useAuth";
-import AddPropertyToast from "../../components/AddPropertyToast";
+import AccountUpgradeToast from "../../components/toasts/AccountUpgradeToast";
 
 const BgParallax = dynamic(() => import("../../components/BgParallax"), {
   ssr: false,
@@ -876,7 +876,7 @@ const HomePage = () => {
           </Col>
         </Row>
       </Container>
-      <AddPropertyToast />
+      <AccountUpgradeToast />
     </RealEstatePageLayout>
   );
 };
