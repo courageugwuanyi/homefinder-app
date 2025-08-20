@@ -13,6 +13,7 @@ import errorMiddleware from './middlewares/error.middleware.js';
 import arcjetMiddleware from './middlewares/arcject.middleware.js';
 import logger from './config/logger.js';
 import propertyRouter from "./routes/property.routes.js";
+import {requestLogger} from "./middlewares/auth.middleware.js";
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use(clerkMiddleware());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(arcjetMiddleware);
+app.use(requestLogger);
 
 // Routes
 app.use('/api/auth', authRouter);
