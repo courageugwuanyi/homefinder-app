@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState, useMemo} from 'react'
+import {useCallback, useEffect, useMemo, useState} from 'react'
 import RealEstatePageLayout from '../../components/partials/RealEstatePageLayout'
 import Link from 'next/link'
 import Container from 'react-bootstrap/Container'
@@ -35,17 +35,29 @@ import {useProperties} from "../../hooks/useProperties"
 import 'leaflet/dist/leaflet.css'
 import {useRouter} from "next/router"
 import Spinner from 'react-bootstrap/Spinner'
-import AddPropertyToast from "../../components/AddPropertyToast"
+import AccountUpgradeToast from "../../components/toasts/AccountUpgradeToast"
+import {useToast} from "../../hooks/useToast";
+import ErrorToast from "../../components/toasts/ErrorToast";
+import WarningToast from "../../components/toasts/WarningToast";
+import PrimaryToast from "../../components/toasts/PrimaryToast";
 
 const AddPropertyPage = () => {
   const router = useRouter()
   const { user, isLoading, isAuthenticated } = useAuth()
   const { addProperty, isSubmitting, submitError, clearSubmitError } = useProperties()
+  const {
+    toasts,
+    showSuccess,
+    showError,
+    showWarning,
+    hideSuccess,
+    hideError,
+    hideWarning
+  } = useToast()
 
   // State management
   const [isServiced, setIsServiced] = useState(false)
   const [validationErrors, setValidationErrors] = useState({})
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
 
   // Property configuration based on type
   const getPropertyConfig = useMemo(() => (propertyType) => {
@@ -655,6 +667,12 @@ const AddPropertyPage = () => {
     e.preventDefault()
 
     if (!validateForm()) {
+      // Show validation warning toast
+      showWarning(
+          'Please fill in all required fields correctly.',
+          'Validation Required'
+      )
+
       // Scroll to first error
       const firstErrorField = Object.keys(validationErrors)[0]
       if (firstErrorField) {
@@ -672,14 +690,31 @@ const AddPropertyPage = () => {
     const result = await addProperty(propertyData)
 
     if (result.success) {
-      setShowSuccessAlert(true)
+      showSuccess(
+          'Property added successfully!',
+          'Property Added'
+      )
 
-      // Redirect after success
+      // TODO: Redirect after success url should go to draft in /real-estate/account-properties
       setTimeout(() => {
         router.push(`/real-estate/catalog?category=${formData.category}`)
-      }, 2000)
+      }, 4000)
+    } else {
+      // Show error toast if submission fails
+      showError(
+          result.error.message || 'Failed to add property. Please try again.',
+          'Submission Failed'
+      )
     }
-  }, [validateForm, validationErrors, prepareFormData, addProperty, router])
+  }, [validateForm, validationErrors, prepareFormData, addProperty, router, formData.category, showSuccess, showError, showWarning])
+
+  // Clear submit error when it changes and show toast
+  useEffect(() => {
+    if (submitError) {
+      showError(submitError, 'Submission Error')
+      clearSubmitError()
+    }
+  }, [submitError, showError, clearSubmitError])
 
   // Update form data handler
   const handleInputChange = useCallback((field, value) => {
@@ -883,7 +918,7 @@ const AddPropertyPage = () => {
             userLoggedIn={isAuthenticated}
             user={user}
         >
-          <AddPropertyToast />
+          <AccountUpgradeToast />
           <div style={{ minHeight: '50vh' }} className="d-flex align-items-center justify-content-center">
             <Spinner animation='border' variant='primary' role='status'>
               <span className='visually-hidden'>Redirecting...</span>
@@ -901,21 +936,27 @@ const AddPropertyPage = () => {
             userLoggedIn={isAuthenticated}
             user={user}
         >
-          {/* Success Alert */}
-          {showSuccessAlert && (
-              <Alert variant='success' className='position-fixed top-0 start-50 translate-middle-x' style={{zIndex: 9999, marginTop: '20px'}}>
-                <i className='fi-check-circle me-2'></i>
-                Property added successfully! Redirecting to promotion page...
-              </Alert>
-          )}
+          {/* Toast Notifications */}
+          <PrimaryToast
+              show={toasts.success.show}
+              onClose={hideSuccess}
+              title={toasts.success.title}
+              message={toasts.success.message}
+          />
 
-          {/* Submit Error Alert */}
-          {submitError && (
-              <Alert variant='danger' dismissible onClose={clearSubmitError} className='position-fixed top-0 start-50 translate-middle-x' style={{zIndex: 9999, marginTop: '20px'}}>
-                <i className='fi-x-circle me-2'></i>
-                {submitError}
-              </Alert>
-          )}
+          <ErrorToast
+              show={toasts.error.show}
+              onClose={hideError}
+              title={toasts.error.title}
+              message={toasts.error.message}
+          />
+
+          <WarningToast
+              show={toasts.warning.show}
+              onClose={hideWarning}
+              title={toasts.warning.title}
+              message={toasts.warning.message}
+          />
 
           {/* Preview modal - Styled like Single Property Page */}
           <Modal
