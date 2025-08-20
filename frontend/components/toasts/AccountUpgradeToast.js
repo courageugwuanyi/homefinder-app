@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Toast from 'react-bootstrap/Toast'
 import Button from 'react-bootstrap/Button'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../../hooks/useAuth'
 
-const AddPropertyToast = () => {
+const AccountUpgradeToast = () => {
     const router = useRouter()
     const { user } = useAuth()
     const [show, setShow] = useState(false)
@@ -69,4 +69,4 @@ const AddPropertyToast = () => {
     )
 }
 
-export default AddPropertyToast
+export default AccountUpgradeToast
