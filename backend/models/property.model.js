@@ -87,24 +87,6 @@ const propertySchema = new mongoose.Schema({
             type: String,
             required: [true, 'Street address is required'],
             trim: true
-        },
-        coordinates: {
-            type: {
-                type: String,
-                enum: ['Point'],
-                default: 'Point'
-            },
-            coordinates: {
-                type: [Number], // [longitude, latitude]
-                validate: {
-                    validator: function(coordinates) {
-                        if (!coordinates || coordinates.length !== 2) return true;
-                        return coordinates[0] >= -180 && coordinates[0] <= 180 &&
-                            coordinates[1] >= -90 && coordinates[1] <= 90;
-                    },
-                    message: 'Invalid coordinates format'
-                }
-            }
         }
     },
 
@@ -305,28 +287,11 @@ const propertySchema = new mongoose.Schema({
         }]
     },
 
-    // IMPROVED: Agent relationship with better validation
     agent: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: [true, 'Agent is required'],
-        index: true,
-        validate: {
-            validator: async function(agentId) {
-                if (!agentId) return false;
-
-                const User = mongoose.model('User');
-                const user = await User.findById(agentId);
-
-                if (!user) return false;
-
-                // Check if user can add properties
-                return user.accountType !== 'individual' &&
-                    user.accountDetails.accountStatus === 'active' &&
-                    user.activity.propertiesCount < user.subscription.propertiesLimit;
-            },
-            message: 'Invalid agent or agent has reached properties limit'
-        }
+        index: true
     },
 
     // Contact Information
@@ -439,9 +404,8 @@ propertySchema.index({ 'pricing.amount': 1, 'pricing.currency': 1 });
 propertySchema.index({ 'specifications.bedrooms': 1, 'specifications.bathrooms': 1 });
 propertySchema.index({ status: 1, marketStatus: 1, featured: -1, createdAt: -1 });
 propertySchema.index({ agent: 1, status: 1 });
-propertySchema.index({ 'location.coordinates': '2dsphere' });
 
-// Text search
+// Text search index
 propertySchema.index({
     title: 'text',
     description: 'text',
@@ -524,28 +488,6 @@ propertySchema.pre('save', async function(next) {
     next();
 });
 
-// Update agent's properties count
-propertySchema.post('save', async function(doc) {
-    if (doc.isNew && doc.status === 'published') {
-        const User = mongoose.model('User');
-        await User.findByIdAndUpdate(
-            doc.agent,
-            { $inc: { 'activity.propertiesCount': 1 } }
-        );
-    }
-});
-
-propertySchema.post('findOneAndDelete', async function(doc) {
-    if (doc && doc.status === 'published') {
-        const User = mongoose.model('User');
-        await User.findByIdAndUpdate(
-            doc.agent,
-            { $inc: { 'activity.propertiesCount': -1 } }
-        );
-    }
-});
-
-// Set primary image
 propertySchema.pre('save', function(next) {
     if (this.media.images && this.media.images.length > 0) {
         const hasPrimary = this.media.images.some(img => img.isPrimary);
