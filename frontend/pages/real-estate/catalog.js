@@ -39,7 +39,7 @@ const Popup = dynamic(() =>
   { ssr: false }
 )
 import 'leaflet/dist/leaflet.css'
-import AddPropertyToast from "../../components/AddPropertyToast";
+import AccountUpgradeToast from "../../components/toasts/AccountUpgradeToast";
 import {useAuth} from "../../hooks/useAuth";
 
 const CatalogPage = () => {
@@ -1053,7 +1053,7 @@ const CatalogPage = () => {
         <i className='fi-filter me-2'></i>
         Filters
       </Button>
-      <AddPropertyToast />
+      <AccountUpgradeToast />
     </RealEstatePageLayout>
   )
 }
