@@ -92,10 +92,10 @@ const PropertyCard = ({
               return item[0].includes('icon')
                   ? <span key={indx} className='d-inline-block me-4 fs-sm'>
                     {item[1]}
-                    <i className={`${item[0]} ms-1 mt-n1 fs-lg text-muted`}></i>
+                    <i className={`${item[0]} ms-1 mt-n1 fs-lg text-muted me-1`}></i>
                     </span>
                   : <span key={indx} className='d-inline-block me-4 fs-sm'>
-                    <i className={`${item[0]} ms-1 mt-n1 fs-lg text-muted`}></i>
+                    <i className={`${item[0]} ms-1 mt-n1 fs-lg text-muted me-1`}></i>
                     {item[1]}
                     </span>
             })}
@@ -114,14 +114,14 @@ const PropertyCard = ({
                       {isPropIcon
                           ? item[1].length > 1 &&
                             <>
-                              <i className={`${item[0]} mx-1 mt-n1 fs-lg text-muted`}></i>
+                              <i className={`${item[0]} mx-1 mt-n1 fs-lg text-muted me-1`}></i>
                               {item[1][1]}
                             </>
                           :
                             item[1].length > 2 &&
                             <>
                               {item[1][0]}
-                              <i className={`${item[0]} ms-1 mt-n1 fs-lg text-muted`}></i>
+                              <i className={`${item[0]} ms-1 mt-n1 fs-lg text-muted me-1`}></i>
                             </>
                       }
                     </span>
