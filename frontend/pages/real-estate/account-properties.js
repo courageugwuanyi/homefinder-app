@@ -231,8 +231,7 @@ const AccountPropertiesPage = () => {
         viewsThisMonth: 567
       }
     },
-
-    // Draft Properties (15 properties) - no analytics for drafts
+    // Draft Properties (15 properties) - some with analytics (previously published)
     {
       id: 5,
       href: '/real-estate/single-v1',
@@ -263,8 +262,8 @@ const AccountPropertiesPage = () => {
       status: 'draft',
       createdAt: '2024-01-18',
       analytics: {
-        views: 0,
-        viewsThisMonth: 0
+        views: 234,
+        viewsThisMonth: 0 // Reset monthly views when moved to draft
       }
     },
     {
@@ -297,8 +296,8 @@ const AccountPropertiesPage = () => {
       status: 'draft',
       createdAt: '2024-01-19',
       analytics: {
-        views: 0,
-        viewsThisMonth: 0
+        views: 567,
+        viewsThisMonth: 0 // Reset monthly views when moved to draft
       }
     },
     {
@@ -488,7 +487,6 @@ const AccountPropertiesPage = () => {
         viewsThisMonth: 0
       }
     },
-
     // Archived Properties (18 properties) - historical analytics
     {
       id: 9,
@@ -835,7 +833,6 @@ const AccountPropertiesPage = () => {
       const matchesSearch = searchTerm === '' ||
           property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           property.location.toLowerCase().includes(searchTerm.toLowerCase())
-
       return matchesTab && matchesSearch
     })
 
@@ -982,7 +979,6 @@ const AccountPropertiesPage = () => {
   // Tab-specific delete all function
   const deleteAll = (e) => {
     e.preventDefault()
-
     switch (activeTab) {
       case 'published':
         return
@@ -997,17 +993,35 @@ const AccountPropertiesPage = () => {
     }
   }
 
-  // Function to change property status
+  // Function to change property status with analytics handling
   const changePropertyStatus = (propertyId, newStatus) => {
-    setProperties(properties.map(property =>
-        property.id === propertyId
-            ? {
-              ...property,
-              status: newStatus,
-              ...(newStatus === 'archived' && { archivedAt: new Date().toISOString().split('T')[0] })
-            }
-            : property
-    ))
+    setProperties(properties.map(property => {
+      if (property.id === propertyId) {
+        let updatedProperty = {
+          ...property,
+          status: newStatus,
+          ...(newStatus === 'archived' && { archivedAt: new Date().toISOString().split('T')[0] })
+        }
+
+        // Handle analytics based on status change
+        if (newStatus === 'published') {
+          // When publishing, start fresh monthly views but keep total views
+          updatedProperty.analytics = {
+            ...property.analytics,
+            viewsThisMonth: 0 // Reset monthly counter when republishing
+          }
+        } else if (newStatus === 'draft') {
+          // When moving to draft, reset monthly views to 0
+          updatedProperty.analytics = {
+            ...property.analytics,
+            viewsThisMonth: 0
+          }
+        }
+
+        return updatedProperty
+      }
+      return property
+    }))
   }
 
   // Function to promote property
@@ -1030,6 +1044,88 @@ const AccountPropertiesPage = () => {
       return (num / 1000).toFixed(1) + 'k'
     }
     return num.toString()
+  }
+
+  // Format date for display with human readable format
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+  }
+
+  // Analytics card component with improved mobile layout
+  const AnalyticsCard = ({ property }) => {
+    const { analytics, createdAt, status } = property
+
+    // Show analytics card for all published and archived properties, and drafts with views
+    const shouldShowAnalytics = status === 'published' || status === 'archived' || (status === 'draft' && analytics.views > 0)
+
+    if (!shouldShowAnalytics) {
+      return null
+    }
+
+    const hasViews = analytics.views > 0
+    const hasMonthlyViews = status === 'published' && analytics.viewsThisMonth > 0
+
+    return (
+        <div className='card border-0 bg-light mt-2' style={{ borderRadius: '0px !important' }}>
+          <div className='card-body py-2 px-3'>
+            <div className='d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between'>
+              {/* Created date */}
+              <div className='d-flex align-items-center text-muted small mb-2 mb-md-0'>
+                <i className='fi-calendar me-2 opacity-60'></i>
+                <span className='fw-medium'>Created: {formatDate(createdAt)}</span>
+              </div>
+
+              {/* Analytics info - always show for published, even if 0 views */}
+              <div className='d-flex align-items-center flex-wrap gap-3'>
+                {/* Always show views for published properties, even if 0 */}
+                {status === 'published' && (
+                    <div className='d-flex align-items-center text-muted small'>
+                      <i className='fi-eye me-2 opacity-60'></i>
+                      <span className='fw-medium'>{formatNumber(analytics.views)} views</span>
+                    </div>
+                )}
+
+                {/* Show views for archived/draft only if > 0 */}
+                {(status === 'archived' || status === 'draft') && hasViews && (
+                    <div className='d-flex align-items-center text-muted small'>
+                      <i className='fi-eye me-2 opacity-60'></i>
+                      <span className='fw-medium'>{formatNumber(analytics.views)} views</span>
+                    </div>
+                )}
+
+                {/* Monthly views only for published properties with monthly views */}
+                {hasMonthlyViews && (
+                    <div className='d-flex align-items-center text-success small'>
+                      <i className='fi-trending-up me-2'></i>
+                      <span className='fw-medium'>{formatNumber(analytics.viewsThisMonth)}+ this month</span>
+                    </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <style jsx>{`
+            .card {
+              border-radius: 0 !important;
+            }
+            .card-body {
+              border-radius: 0 !important;
+            }
+            @media (max-width: 767.98px) {
+              .card-body {
+                padding: 0.75rem 1rem;
+              }
+              .small {
+                font-size: 0.8125rem;
+              }
+            }
+          `}</style>
+        </div>
+    )
   }
 
   return (
@@ -1117,7 +1213,7 @@ const AccountPropertiesPage = () => {
                 {(activeTab === 'published' || activeTab === 'archived') && tabAnalytics.totalViews > 0 && (
                     <div className='small d-flex flex-wrap gap-3'>
                   <span>
-                    <i className='fi-eye me-1 text-muted'></i>
+                    <i className='fi-eye-on me-1 text-muted'></i>
                     {formatNumber(tabAnalytics.totalViews)} total views
                   </span>
                     </div>
@@ -1163,25 +1259,20 @@ const AccountPropertiesPage = () => {
                     dropdown={getDropdownOptions(property, activeTab, changePropertyStatus, handleDeleteClick, promoteProperty, restoreProperty)}
                     horizontal
                 />
-                <div className='small text-muted mt-2 ps-3 d-flex flex-wrap gap-2 gap-md-4'>
-                  <span>Created: {new Date(property.createdAt).toLocaleDateString()}</span>
-                  {(activeTab === 'published' || activeTab === 'archived') && property.analytics && property.analytics.views > 0 && (
-                      <>
-                  <span>
-                    <i className='fi-eye me-1'></i>
-                    {formatNumber(property.analytics.views)} views
-                  </span>
-                        {activeTab === 'published' && property.analytics.viewsThisMonth > 0 && (
-                            <span className='text-success'>
-                      | {formatNumber(property.analytics.viewsThisMonth)}+ views this month
-                    </span>
-                        )}
-                      </>
-                  )}
-                  {property.archivedAt && (
-                      <span>Archived: {new Date(property.archivedAt).toLocaleDateString()}</span>
-                  )}
-                </div>
+                <AnalyticsCard property={property} />
+
+                {/* Add spacing between icons and numbers in PropertyCard footer */}
+                <style jsx global>{`
+                  .property-card .card-footer .d-flex i {
+                    margin-right: 0.375rem !important;
+                  }
+                  .property-card .card-footer .text-muted {
+                    margin-right: 1rem;
+                  }
+                  .property-card .card-footer .text-muted:last-child {
+                    margin-right: 0;
+                  }
+                `}</style>
               </div>
           )) : (
               <div className='text-center pt-2 pt-md-4 pt-lg-5 pb-2 pb-md-0'>
@@ -1213,7 +1304,6 @@ const AccountPropertiesPage = () => {
                       disabled={currentPage === 1}
                       onClick={() => setCurrentPage(currentPage - 1)}
                   />
-
                   {[...Array(totalPages)].map((_, index) => {
                     const page = index + 1
                     if (
@@ -1238,7 +1328,6 @@ const AccountPropertiesPage = () => {
                     }
                     return null
                   })}
-
                   <Pagination.Next
                       disabled={currentPage === totalPages}
                       onClick={() => setCurrentPage(currentPage + 1)}
