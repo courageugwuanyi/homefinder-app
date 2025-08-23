@@ -1,3 +1,4 @@
+// utils/propertyTransform.js
 export const transformDatabaseProperty = (dbProperty) => {
     // Map category to display format
     const getCategoryDisplay = (category) => {
@@ -33,7 +34,7 @@ export const transformDatabaseProperty = (dbProperty) => {
         return badges;
     };
 
-    // Format price using your database virtuals
+    // Format price
     const formatPrice = (pricing) => {
         const symbol = pricing.currency === 'usd' ? '$' : '₦';
         const amount = pricing.amount.toLocaleString();
@@ -43,11 +44,22 @@ export const transformDatabaseProperty = (dbProperty) => {
 
     // Get primary image
     const getPrimaryImage = (media) => {
-        if (media?.images?.length > 0) {
-            const primaryImg = media.images.find(img => img.isPrimary);
-            return primaryImg?.url || media.images[0]?.url;
+        // Check if media exists and has images array
+        if (media && media.images && Array.isArray(media.images) && media.images.length > 0) {
+            // Look for primary image first
+            const primaryImg = media.images.find(img => img.isPrimary === true);
+            if (primaryImg && primaryImg.url) {
+                return primaryImg.url;
+            }
+
+            // Fall back to first image
+            if (media.images[0] && media.images[0].url) {
+                return media.images[0].url;
+            }
         }
-        return '/images/real-estate/placeholder.jpg';
+
+        // Fallback placeholder
+        return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZTllY2VmIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzZjNzU3ZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
     };
 
     // Create full address
