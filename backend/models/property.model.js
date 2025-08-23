@@ -329,7 +329,7 @@ const propertySchema = new mongoose.Schema({
             values: ['draft', 'published', 'archived', 'suspended'],
             message: 'Invalid property status'
         },
-        default: 'published',
+        default: 'draft',
         index: true
     },
 
