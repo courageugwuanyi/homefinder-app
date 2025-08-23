@@ -6,7 +6,7 @@ const PrimaryToast = ({
                           onClose,
                           title = "Success",
                           message,
-                          delay = 4000
+                          delay = 3000
                       }) => {
     useEffect(() => {
         if (show) {
@@ -29,7 +29,7 @@ const PrimaryToast = ({
                 </Toast.Header>
                 <Toast.Body>
                     <div className="mb-3">
-                        <p className="mb-2 fs-sm text-primary">
+                        <p className="mb-2 fs-sm text-dark">
                             {message}
                         </p>
                     </div>
