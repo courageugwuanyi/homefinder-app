@@ -29,7 +29,7 @@ const ErrorToast = ({
                 </Toast.Header>
                 <Toast.Body>
                     <div className="mb-3">
-                        <p className="mb-2 fs-sm text-danger">
+                        <p className="mb-2 text-dark">
                             {message}
                         </p>
                     </div>
