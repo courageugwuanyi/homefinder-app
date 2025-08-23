@@ -40,6 +40,7 @@ import {useToast} from "../../hooks/useToast";
 import ErrorToast from "../../components/toasts/ErrorToast";
 import WarningToast from "../../components/toasts/WarningToast";
 import PrimaryToast from "../../components/toasts/PrimaryToast";
+import {validateAllPropertyFields, validatePropertyField} from "../../utils/propertyValidation";
 
 const AddPropertyPage = () => {
   const router = useRouter()
@@ -545,39 +546,48 @@ const AddPropertyPage = () => {
 
   // Form validation function
   const validateForm = useCallback(() => {
-    const errors = {}
+    const propertyFormData = {
+      ...formData,
+      // Add dynamic fields for validation
+      ...(currentPropertyConfig.showBedrooms && { bedrooms: bedroomsValue }),
+      ...(currentPropertyConfig.showBathrooms && { bathrooms: bathroomsValue }),
+      ...(currentPropertyConfig.showToilets && { toilets: toiletsValue }),
+      ...(currentPropertyConfig.showParking && { parking: parkingsValue }),
+      ...(currentPropertyConfig.showFloors && { floors: floorsValue }),
+      ...(currentPropertyConfig.showUnits && { units: unitsValue }),
+      ...(showServicedOption && { isServiced }),
+      ...(selectedAmenities.length > 0 && { amenities: selectedAmenities }),
+    };
 
-    // Required field validations
-    if (!formData.title.trim()) errors.title = 'Title is required'
-    if (!formData.category) errors.category = 'Category is required'
-    if (!formData.propertyType) errors.propertyType = 'Property type is required'
-    if (!formData.country) errors.country = 'Country is required'
-    if (!formData.city) errors.city = 'City is required'
-    if (!formData.district) errors.district = 'District is required'
-    if (!formData.zipCode.trim()) errors.zipCode = 'Zip code is required'
-    if (!formData.address.trim()) errors.address = 'Address is required'
-    if (!formData.description.trim()) errors.description = 'Description is required'
-    if (!formData.price) errors.price = 'Price is required'
-    if (!formData.phone.trim()) errors.phone = 'Phone number is required'
+    const validation = validateAllPropertyFields(propertyFormData, {
+      requireGallery: true,
+      gallery: gallery,
+      requireArea: currentPropertyConfig.areaRequired
+    });
 
-    // Company validation for businesses
-    if (isCompanyRequired && !formData.company.trim()) {
-      errors.company = 'Company name is required for registered businesses'
+    setValidationErrors(validation.errors);
+
+    // Show specific field errors as toast messages
+    if (!validation.isValid) {
+      const firstError = validation.fieldErrors[0];
+      showError(
+          firstError.message,
+          'Validation Error'
+      );
+
+      // If multiple errors, show summary
+      if (validation.fieldErrors.length > 1) {
+        setTimeout(() => {
+          showWarning(
+              `Please fix ${validation.fieldErrors.length} validation errors to continue.`,
+              'Multiple Errors Found'
+          );
+        }, 2000);
+      }
     }
 
-    // Area validation if required
-    if (currentPropertyConfig.areaRequired && !formData.area) {
-      errors.area = 'Area is required for this property type'
-    }
-
-    // Gallery validation
-    if (gallery.length === 0) {
-      errors.gallery = 'At least one photo or video is required'
-    }
-
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
-  }, [formData, isCompanyRequired, currentPropertyConfig.areaRequired, gallery.length])
+    return validation.isValid;
+  }, [formData, gallery, currentPropertyConfig, bedroomsValue, bathroomsValue, toiletsValue, parkingsValue, floorsValue, unitsValue, showServicedOption, isServiced, selectedAmenities, showError, showWarning]);
 
   // Prepare form data for submission
   const prepareFormData = useCallback(() => {
@@ -664,49 +674,80 @@ const AddPropertyPage = () => {
 
   // Handle form submission
   const handleSubmit = useCallback(async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!validateForm()) {
-      // Show validation warning toast
-      showWarning(
-          'Please fill in all required fields correctly.',
-          'Validation Required'
-      )
-
       // Scroll to first error
-      const firstErrorField = Object.keys(validationErrors)[0]
+      const firstErrorField = Object.keys(validationErrors)[0];
       if (firstErrorField) {
         const element = document.getElementById(`ap-${firstErrorField}`) ||
-            document.getElementById(`ab-${firstErrorField}`)
+            document.getElementById(`ab-${firstErrorField}`);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          element.focus()
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => element.focus(), 500);
         }
       }
-      return
+      return;
     }
 
-    const propertyData = prepareFormData()
-    const result = await addProperty(propertyData)
+    // Prepare form data with all the dynamic fields
+    const propertyFormData = {
+      ...formData,
+      ...(currentPropertyConfig.showBedrooms && { bedrooms: bedroomsValue }),
+      ...(currentPropertyConfig.showBathrooms && { bathrooms: bathroomsValue }),
+      ...(currentPropertyConfig.showToilets && { toilets: toiletsValue }),
+      ...(currentPropertyConfig.showParking && { parking: parkingsValue }),
+      ...(currentPropertyConfig.showFloors && { floors: floorsValue }),
+      ...(currentPropertyConfig.showUnits && { units: unitsValue }),
+      ...(showServicedOption && { isServiced }),
+      ...(selectedAmenities.length > 0 && { amenities: selectedAmenities }),
+    };
+
+    console.log('Submitting property with data:', propertyFormData);
+
+    const result = await addProperty(propertyFormData, gallery);
 
     if (result.success) {
       showSuccess(
-          'Property added successfully!',
-          'Property Added'
-      )
-
-      // TODO: Redirect after success url should go to draft in /real-estate/account-properties
+          result.message || 'Property added successfully!',
+          'Success'
+      );
       setTimeout(() => {
-        router.push(`/real-estate/catalog?category=${formData.category}`)
-      }, 4000)
+        router.push('/real-estate/account-properties');
+      }, 2000);
     } else {
-      // Show error toast if submission fails
-      showError(
-          result.error.message || 'Failed to add property. Please try again.',
-          'Submission Failed'
-      )
+      // Handle different types of errors
+      if (result.fieldErrors && result.fieldErrors.length > 0) {
+        // Show first field error as main error
+        const firstFieldError = result.fieldErrors[0];
+        showError(
+            firstFieldError.message,
+            'Validation Failed'
+        );
+
+        // Update field validation errors
+        if (result.validationErrors) {
+          setValidationErrors(result.validationErrors);
+        }
+
+        // Show summary if multiple errors
+        if (result.fieldErrors.length > 1) {
+          setTimeout(() => {
+            showWarning(
+                `Found ${result.fieldErrors.length} validation errors. Please check all required fields.`,
+                'Multiple Validation Errors'
+            );
+          }, 2000);
+        }
+      } else {
+        // General error
+        showError(
+            result.error || 'Failed to add property. Please try again.',
+            'Submission Failed'
+        );
+      }
     }
-  }, [validateForm, validationErrors, prepareFormData, addProperty, router, formData.category, showSuccess, showError, showWarning])
+  }, [validateForm, validationErrors, formData, currentPropertyConfig, bedroomsValue, bathroomsValue, toiletsValue, parkingsValue, floorsValue, unitsValue, showServicedOption, isServiced, selectedAmenities, gallery, addProperty, router, showSuccess, showError, showWarning]);
 
   // Clear submit error when it changes and show toast
   useEffect(() => {
@@ -719,28 +760,27 @@ const AddPropertyPage = () => {
   // Update form data handler
   const handleInputChange = useCallback((field, value) => {
     if (['firstName', 'lastName', 'email'].includes(field) && isAuthenticated) {
-      return
+      return;
     }
 
     setFormData(prev => ({
       ...prev,
       [field]: value
-    }))
+    }));
 
-    // Clear specific field validation error
-    if (validationErrors[field]) {
-      setValidationErrors(prev => ({ ...prev, [field]: null }))
-    }
+    // Real-time validation for the field
+    const fieldError = validatePropertyField(field, value, { ...formData, [field]: value });
 
-    // Handle company field validation
-    if (field === 'company') {
-      if (value && validationErrors.company) {
-        setValidationErrors(prev => ({ ...prev, company: false }))
-      } else if (!value && isCompanyRequired) {
-        setValidationErrors(prev => ({ ...prev, company: true }))
-      }
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: fieldError
+    }));
+
+    // Clear submit error when user makes changes
+    if (submitError) {
+      clearSubmitError();
     }
-  }, [isAuthenticated, validationErrors, isCompanyRequired])
+  }, [isAuthenticated, formData, submitError, clearSubmitError]);
 
   // Handle amenity change
   const handleAmenityChange = useCallback((amenityValue, isChecked) => {
