@@ -8,16 +8,21 @@ import {
     updatePropertyMedia,
     deleteProperty,
     getProperty,
-    searchProperties
+    searchProperties,
+    getPropertyCounts,
+    getPropertyStats,
+    getAllPropertyStats,
+    promoteProperty
 } from "../controllers/property.controller.js";
 import { validateAddProperty } from "../middlewares/validations/property.js";
 
 const propertyRouter = Router();
 
+// Multer configuration
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 100 * 1024 * 1024,
+        fileSize: 100 * 1024 * 1024, // 100MB per file
         files: 10
     },
     fileFilter: (req, file, cb) => {
@@ -29,16 +34,28 @@ const upload = multer({
     }
 });
 
+// Public routes (before auth middleware)
 propertyRouter.get('/search', searchProperties);
 
+// Protected routes (after auth middleware)
 propertyRouter.use(authorize);
 
-propertyRouter.post('/add-property', upload.array('gallery', 10), validateAddProperty, addProperty);
+// User property management routes
+propertyRouter.get('/my-properties/stats', getAllPropertyStats); // Single endpoint for all stats
+propertyRouter.get('/my-properties/stats-individual', getPropertyStats); // Fallback endpoint
+propertyRouter.get('/my-properties/counts', getPropertyCounts);
 propertyRouter.get('/my-properties', getUserProperties);
 
-propertyRouter.get('/:propertyId', getProperty);
+// Property creation
+propertyRouter.post('/add-property', upload.array('gallery', 10), validateAddProperty, addProperty);
+
+// Property actions by ID (parameterized paths AFTER specific paths)
+propertyRouter.put('/:propertyId/promote', promoteProperty);
 propertyRouter.put('/:propertyId/status', updatePropertyStatus);
 propertyRouter.put('/:propertyId/media', upload.array('gallery', 10), updatePropertyMedia);
 propertyRouter.delete('/:propertyId', deleteProperty);
+
+// Single property retrieval (LAST because it's most generic)
+propertyRouter.get('/:propertyId', getProperty);
 
 export default propertyRouter;
