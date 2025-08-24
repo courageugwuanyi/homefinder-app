@@ -29,13 +29,15 @@ app.use(express.json());
 app.use(clerkMiddleware());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(arcjetMiddleware);
 app.use(requestLogger);
 
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/properties', propertyRouter);
+
+app.use(arcjetMiddleware);
+
 app.use('/api/subscriptions', subscriptionRouter);
 app.use('/api/workflows', workflowRouter);
 
