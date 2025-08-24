@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { formatPropertyDataForAPI, validateAllPropertyFields, parseBackendErrors } from "../utils/propertyValidation";
 import { invalidateAllCaches, invalidateAnalyticsCache } from '../utils/analyticsUtils';
@@ -9,6 +9,10 @@ export const useProperties = () => {
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Rate limiting ref
+    const lastRefreshTimeRef = useRef(0);
 
     // Extract files from gallery
     const extractFilesFromGallery = useCallback((gallery) => {
@@ -52,7 +56,57 @@ export const useProperties = () => {
         return formData;
     }, []);
 
-    // 🚀 FIXED: Fetch user properties without problematic headers
+    // Force refresh with intelligent rate limiting
+    const forceRefreshData = useCallback(async (showLoader = false) => {
+        const now = Date.now();
+
+        // Rate limiting (minimum 2 seconds apart)
+        if (now - lastRefreshTimeRef.current < 2000) {
+            return;
+        }
+        lastRefreshTimeRef.current = now;
+
+        if (showLoader) setIsRefreshing(true);
+
+        try {
+            const timestamp = Date.now();
+            const cacheBuster = Math.random().toString(36).substr(2, 9);
+
+            const config = {
+                timeout: 10000,
+                validateStatus: (status) => status >= 200 && status < 300
+            };
+
+            const response = await api.get(`/properties/my-properties`, {
+                params: {
+                    limit: 100,
+                    page: 1,
+                    _t: timestamp,
+                    _bust: cacheBuster,
+                    _cache: 'no-cache'
+                },
+                ...config
+            });
+
+            if (response.data?.success) {
+                const freshProperties = response.data.data.properties || [];
+                setProperties(freshProperties);
+                invalidateAllCaches();
+                return freshProperties;
+            }
+        } catch (error) {
+            // Fallback to regular fetch
+            try {
+                await fetchUserProperties();
+            } catch (fallbackError) {
+                // Silent fallback failure
+            }
+        } finally {
+            if (showLoader) setIsRefreshing(false);
+        }
+    }, []);
+
+    // Fetch user properties
     const fetchUserProperties = useCallback(async (queryParams = {}, bustCache = false) => {
         setLoading(true);
         setError(null);
@@ -64,14 +118,11 @@ export const useProperties = () => {
                 ...queryParams
             });
 
-            // Add cache busting parameter if needed
             if (bustCache) {
                 params.append('_t', Date.now().toString());
             }
 
-            // 🚀 FIXED: Removed problematic headers and use different cache busting approach
             const config = {
-                // Use axios config instead of headers for cache control
                 timeout: 10000,
                 validateStatus: (status) => status >= 200 && status < 300
             };
@@ -82,7 +133,6 @@ export const useProperties = () => {
                 const properties = response.data.data.properties || [];
                 setProperties(properties);
 
-                // Clear any caches after successful fetch
                 if (bustCache) {
                     invalidateAllCaches();
                 }
@@ -95,11 +145,9 @@ export const useProperties = () => {
             }
 
             throw new Error(response?.data?.message || 'Failed to fetch properties');
-
         } catch (error) {
             const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch properties';
             setError(errorMessage);
-
             return {
                 properties: [],
                 pagination: null,
@@ -118,7 +166,6 @@ export const useProperties = () => {
         try {
             const imageFiles = extractFilesFromGallery(gallery);
 
-            // Frontend validation
             const validation = validateAllPropertyFields(propertyData, {
                 requireGallery: false,
                 gallery: imageFiles,
@@ -145,12 +192,11 @@ export const useProperties = () => {
             });
 
             if (response.data?.success) {
-                // Force refresh with cache busting
                 try {
                     await fetchUserProperties({}, true);
                     invalidateAnalyticsCache();
                 } catch (fetchError) {
-                    // Non-blocking error
+                    // Non-blocking
                 }
 
                 return {
@@ -162,7 +208,6 @@ export const useProperties = () => {
             }
 
             throw new Error(response.data?.message || 'Failed to add property');
-
         } catch (error) {
             let errorMessage = 'Failed to add property. Please try again.';
             let fieldErrors = [];
@@ -193,10 +238,9 @@ export const useProperties = () => {
         }
     }, [extractFilesFromGallery, createPropertyFormData, fetchUserProperties]);
 
-    // Bulk status updates with immediate UI update and cache invalidation
+    // Bulk status updates
     const updateMultiplePropertyStatuses = useCallback(async (updates) => {
         try {
-            // Optimistically update local state immediately
             setProperties(prevProperties =>
                 prevProperties.map(property => {
                     const update = updates.find(u => u.propertyId === property._id);
@@ -223,7 +267,6 @@ export const useProperties = () => {
             // Process batches sequentially
             for (let i = 0; i < batches.length; i++) {
                 const batch = batches[i];
-
                 const promises = batch.map(({ propertyId, status }) =>
                     api.put(`/properties/${propertyId}/status`, { status })
                 );
@@ -239,7 +282,6 @@ export const useProperties = () => {
                     }
                 });
 
-                // Rate limiting delay
                 if (i < batches.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
@@ -259,20 +301,17 @@ export const useProperties = () => {
             }
 
             return { successful, failed };
-
         } catch (error) {
             setTimeout(() => {
                 fetchUserProperties({}, true);
             }, 1000);
-
             const errorMessage = error.response?.data?.message || error.message || 'Failed to update properties';
             return { successful: [], failed: updates, error: errorMessage };
         }
     }, [fetchUserProperties]);
 
-    // Single property status update with cache invalidation
+    // Single property status update
     const updatePropertyStatus = useCallback(async (propertyId, newStatus) => {
-        // Optimistically update local state
         setProperties(prevProperties =>
             prevProperties.map(property => {
                 if (property._id === propertyId) {
@@ -290,30 +329,24 @@ export const useProperties = () => {
             const response = await api.put(`/properties/${propertyId}/status`, { status: newStatus });
 
             if (response.data?.success) {
-                // Success - invalidate caches and refresh
                 invalidateAllCaches();
                 setTimeout(() => {
                     fetchUserProperties({}, true);
                 }, 500);
-
                 return { success: true };
             } else {
-                // API call succeeded but operation failed - revert optimistic update
                 setTimeout(() => {
                     fetchUserProperties({}, true);
                 }, 1000);
-
                 return {
                     success: false,
                     error: response.data?.message || 'Update failed'
                 };
             }
         } catch (error) {
-            // API call failed - revert optimistic update
             setTimeout(() => {
                 fetchUserProperties({}, true);
             }, 1000);
-
             return {
                 success: false,
                 error: error.response?.data?.message || error.message || 'Update failed'
@@ -325,17 +358,11 @@ export const useProperties = () => {
     const deleteProperty = useCallback(async (propertyId) => {
         try {
             const response = await api.delete(`/properties/${propertyId}`);
-
             if (response.data?.success) {
-                // Optimistically remove from local state
                 setProperties(prev => prev.filter(p => p._id !== propertyId));
-
-                // Invalidate caches
                 invalidateAllCaches();
-
                 return { success: true, message: response.data.message };
             }
-
             return { success: false, error: response.data?.message || 'Failed to delete property' };
         } catch (error) {
             const errorMessage = error.response?.data?.message || error.message || 'Failed to delete property';
@@ -348,7 +375,6 @@ export const useProperties = () => {
         return fetchUserProperties({}, bustCache);
     }, [fetchUserProperties]);
 
-    // Utility functions
     const clearSubmitError = useCallback(() => setSubmitError(null), []);
     const clearError = useCallback(() => setError(null), []);
 
@@ -359,6 +385,7 @@ export const useProperties = () => {
         error,
         isSubmitting,
         submitError,
+        isRefreshing,
 
         // Actions
         addProperty,
@@ -367,6 +394,7 @@ export const useProperties = () => {
         refreshProperties,
         updatePropertyStatus,
         updateMultiplePropertyStatuses,
+        forceRefreshData,
 
         // Utils
         clearSubmitError,
