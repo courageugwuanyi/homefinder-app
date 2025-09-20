@@ -201,8 +201,8 @@ const HomePage = () => {
   ];
 
     const [category, setCategory] = useState('Buy');
-    const [propertyType, setPropertyType] = useState('Property type');
-    const [priceRange, setPriceRange] = useState('Price range');
+    const [propertyType, setPropertyType] = useState('all');
+    const [priceRange, setPriceRange] = useState('');
     const [location, setLocation] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -227,13 +227,13 @@ const HomePage = () => {
         const params = new URLSearchParams();
 
         if (category && category !== 'buy') params.set('category', category);
-        if (propertyType && propertyType !== 'all') params.set('type', propertyType);
+        if (propertyType) params.set('type', propertyType);
         if (location.trim()) params.set('location', location.trim());
         if (priceRange) params.set('price', priceRange);
 
         const query = params.toString();
 
-        router.push(`/catalog${query ? `?${query}` : ''}`);
+        router.push(`/properties${query ? `?${query}` : ''}`);
     };
 
   // properties.title keyword array
@@ -403,7 +403,7 @@ const HomePage = () => {
                         />
                         <hr className="d-sm-none my-2" />
                         <DropdownSelect
-                            defaultValue="Property type"
+                            defaultValue="All Types"
                             icon="fi-list"
                             options={[
                                 ["all", "All Types"],
